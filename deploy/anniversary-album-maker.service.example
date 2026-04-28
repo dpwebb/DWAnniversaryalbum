@@ -1,0 +1,17 @@
+[Unit]
+Description=Anniversary Album Maker
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/anniversary-album-maker
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

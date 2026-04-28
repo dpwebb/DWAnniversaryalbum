@@ -35,6 +35,15 @@ Open the local URL printed by Vite, usually `http://localhost:5173`.
 npm run build
 ```
 
+## Run Production Mode Locally
+
+```bash
+npm run build
+npm start
+```
+
+The production server serves the React app and the Suno callback API from the same port.
+
 ## Optional Music API Setup
 
 The app still works locally without these APIs. Add tokens only when you want to submit generated plans to external services.
@@ -45,6 +54,31 @@ The app still works locally without these APIs. Add tokens only when you want to
 - Choose the Suno model and vocal settings.
 - Each track has `Generate` and `Check` actions.
 - The app submits each track with custom mode enabled, using the original lyrics draft unless instrumental mode is selected.
+
+#### Suno Callback Receiver
+
+Suno callbacks require a publicly accessible POST endpoint. This project includes a local callback receiver for development:
+
+```bash
+npm run callback
+```
+
+It listens at:
+
+```text
+http://localhost:8787/api/suno/callback
+```
+
+The receiver:
+
+- Accepts Suno `POST` callbacks using the documented JSON format.
+- Returns `200` with `{ "status": "received" }` quickly.
+- Stores callback records in `data/suno-callbacks.json`.
+- Exposes stored records at `GET /api/suno/callbacks`.
+
+For real Suno delivery, expose the local callback server through a public HTTPS tunnel or deploy the callback receiver to a public server, then use that public URL in the app's Suno callback field. After Suno sends callbacks, use `Load Suno callbacks` in the app to merge completed audio URLs into matching track task IDs.
+
+For Hostinger VPS production deployment at `https://dwmusichub.com`, see [HOSTINGER_DEPLOYMENT.md](HOSTINGER_DEPLOYMENT.md).
 
 ### Kits AI
 

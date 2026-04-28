@@ -10,6 +10,7 @@ import {
 import {
   createKitsVoiceConversion,
   createSunoSong,
+  fetchSunoCallbacks,
   fetchKitsVoiceModels,
   getKitsVoiceConversion,
   getSunoSong,
@@ -39,6 +40,10 @@ import type {
 const sampleMemories = 'our first trip together, quiet Sunday mornings, the day we knew this was real';
 const samplePlaces = 'home, the beach, our favorite restaurant';
 const sampleJokes = 'the parking lot debate, our secret phrase, the wrong-turn adventure';
+
+function productionCallbackUrl() {
+  return `${window.location.origin}/api/suno/callback`;
+}
 
 export default function App() {
   const saved = useMemo(() => loadDraft(), []);
@@ -286,6 +291,46 @@ export default function App() {
       setStatus(`Updated Suno status for track ${trackId}: ${result.status}.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to check Suno status.');
+    } finally {
+      setApiBusy('');
+    }
+  }
+
+  async function loadSunoCallbacks() {
+    setApiBusy('suno-callbacks');
+    setError('');
+    try {
+      const callbacks = await fetchSunoCallbacks(apiSettings.suno.callbackUrl);
+      const callbacksByTaskId = new Map(callbacks.map((callback) => [callback.taskId, callback]));
+      let matched = 0;
+
+      setApiResults((current) => {
+        const next = { ...current };
+        Object.entries(current).forEach(([trackId, result]) => {
+          const taskId = result.suno?.taskId;
+          if (!taskId) return;
+          const callback = callbacksByTaskId.get(taskId);
+          if (!callback) return;
+          matched += 1;
+          next[Number(trackId)] = {
+            ...result,
+            suno: {
+              taskId,
+              status: callback.callbackType === 'complete' && callback.code === 200 ? 'CALLBACK_COMPLETE' : callback.callbackType,
+              message: callback.msg,
+              audioUrls: callback.tracks.map((track) => track.audioUrl).filter(Boolean),
+              streamUrls: callback.tracks.map((track) => track.streamAudioUrl).filter(Boolean),
+              imageUrls: callback.tracks.map((track) => track.imageUrl).filter(Boolean),
+              updatedAt: callback.receivedAt,
+            },
+          };
+        });
+        return next;
+      });
+
+      setStatus(`Loaded ${callbacks.length} Suno callback record${callbacks.length === 1 ? '' : 's'}; matched ${matched}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to load Suno callback records.');
     } finally {
       setApiBusy('');
     }
@@ -563,7 +608,7 @@ export default function App() {
             <TextField
               label="Suno callback URL"
               value={apiSettings.suno.callbackUrl}
-              placeholder="Optional webhook URL"
+              placeholder="Public URL ending in /api/suno/callback"
               onChange={(value) => updateSunoSetting('callbackUrl', value)}
             />
             <TextField
@@ -617,6 +662,28 @@ export default function App() {
               />
             </div>
             <div className="action-row">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => updateSunoSetting('callbackUrl', productionCallbackUrl())}
+              >
+                Use production callback
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => updateSunoSetting('callbackUrl', 'http://localhost:8787/api/suno/callback')}
+              >
+                Use local callback
+              </button>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={loadSunoCallbacks}
+                disabled={apiBusy === 'suno-callbacks'}
+              >
+                Load Suno callbacks
+              </button>
               <button type="button" className="ghost-button" onClick={loadKitsModels} disabled={apiBusy === 'kits-models'}>
                 Load Kits models
               </button>

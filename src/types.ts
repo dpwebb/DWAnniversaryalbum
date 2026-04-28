@@ -75,6 +75,7 @@ export type SunoTrackResult = {
   message: string;
   audioUrls: string[];
   streamUrls: string[];
+  imageUrls?: string[];
   updatedAt: string;
 };
 
@@ -96,4 +97,29 @@ export type KitsVoiceModel = {
   id: number;
   title: string;
   tags?: string[];
+};
+
+export type SunoCallbackTrack = {
+  id: string;
+  title: string;
+  audioUrl: string;
+  sourceAudioUrl: string;
+  streamAudioUrl: string;
+  sourceStreamAudioUrl: string;
+  imageUrl: string;
+  sourceImageUrl: string;
+  prompt: string;
+  modelName: string;
+  tags: string;
+  createTime: string;
+  duration: number | null;
+};
+
+export type SunoCallbackRecord = {
+  receivedAt: string;
+  code: number;
+  msg: string;
+  taskId: string;
+  callbackType: string;
+  tracks: SunoCallbackTrack[];
 };

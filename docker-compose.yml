@@ -1,0 +1,25 @@
+services:
+  anniversary-album-maker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: anniversary-album-maker:latest
+    container_name: anniversary-album-maker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3400
+      HOST: 0.0.0.0
+    network_mode: host
+    volumes:
+      - anniversary-album-data:/app/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.anniversary-album-maker.rule=Host(`dwmusichub.com`)
+      - traefik.http.routers.anniversary-album-maker.entrypoints=websecure
+      - traefik.http.routers.anniversary-album-maker.tls=true
+      - traefik.http.routers.anniversary-album-maker.tls.certresolver=letsencrypt
+      - traefik.http.services.anniversary-album-maker.loadbalancer.server.port=3400
+
+volumes:
+  anniversary-album-data:

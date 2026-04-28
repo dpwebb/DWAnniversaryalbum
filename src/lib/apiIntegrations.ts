@@ -1,4 +1,4 @@
-import type { KitsSettings, KitsVoiceModel, SongPlan, SunoSettings } from '../types';
+import type { KitsSettings, KitsVoiceModel, SongPlan, SunoCallbackRecord, SunoSettings } from '../types';
 
 const SUNO_BASE_URL = 'https://api.sunoapi.org/api/v1';
 const KITS_BASE_URL = 'https://arpeggi.io/api/kits/v1';
@@ -98,6 +98,29 @@ export async function getSunoSong(settings: SunoSettings, taskId: string) {
     audioUrls: items.map((item) => item.audioUrl).filter((url): url is string => Boolean(url)),
     streamUrls: items.map((item) => item.streamAudioUrl).filter((url): url is string => Boolean(url)),
   };
+}
+
+export async function fetchSunoCallbacks(callbackUrl: string, taskId?: string): Promise<SunoCallbackRecord[]> {
+  if (!callbackUrl.trim()) {
+    throw new Error('Suno callback URL is required before callback records can be fetched.');
+  }
+
+  const url = new URL(callbackUrl);
+  url.pathname = url.pathname.replace(/\/api\/suno\/callback\/?$/, '/api/suno/callbacks');
+  if (!url.pathname.endsWith('/api/suno/callbacks')) {
+    url.pathname = '/api/suno/callbacks';
+  }
+  if (taskId) {
+    url.searchParams.set('taskId', taskId);
+  }
+
+  const response = await fetch(url);
+  const payload = (await response.json()) as SunoCallbackRecord[] | { error?: string };
+  if (!response.ok || !Array.isArray(payload)) {
+    throw new Error('error' in payload && payload.error ? payload.error : 'Unable to fetch Suno callbacks.');
+  }
+
+  return payload;
 }
 
 export async function fetchKitsVoiceModels(settings: KitsSettings): Promise<KitsVoiceModel[]> {

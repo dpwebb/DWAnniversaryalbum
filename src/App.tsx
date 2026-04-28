@@ -84,6 +84,7 @@ export default function App() {
   const [voiceModels, setVoiceModels] = useState<KitsVoiceModel[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [apiBusy, setApiBusy] = useState('');
+  const [importDraftText, setImportDraftText] = useState('');
   const [status, setStatus] = useState('Draft autosaves locally and can sync to GitHub.');
   const [error, setError] = useState('');
 
@@ -191,10 +192,46 @@ export default function App() {
     if (!album) return;
     downloadText(
       'anniversary-album-plan.json',
-      JSON.stringify({ inputs, album }, null, 2),
+      JSON.stringify(currentDraft(), null, 2),
       'application/json;charset=utf-8',
     );
     setStatus('Exported JSON.');
+  }
+
+  async function copyDraftJson() {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(currentDraft(), null, 2));
+      setStatus('Copied draft JSON to the clipboard.');
+      setError('');
+    } catch {
+      setError('Clipboard access was blocked by the browser.');
+    }
+  }
+
+  function importDraftJson() {
+    try {
+      const parsed = JSON.parse(importDraftText) as Partial<DraftState> & {
+        inputs?: AlbumInputs;
+        album?: AlbumPlan | null;
+      };
+      if (!parsed.inputs) {
+        throw new Error('Draft JSON is missing inputs.');
+      }
+
+      setInputs(parsed.inputs);
+      setAlbum(parsed.album ?? null);
+      setGenerationCount(parsed.generationCount ?? 0);
+      setApiResults(parsed.apiResults ?? {});
+      setImportDraftText('');
+      setStatus('Imported draft JSON.');
+      setError('');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to import draft JSON.');
+    }
+  }
+
+  function currentDraft(): DraftState {
+    return { inputs, album, generationCount, apiResults };
   }
 
   function resetDraft() {
@@ -556,6 +593,20 @@ export default function App() {
               </button>
               <button type="button" className="ghost-button" onClick={loadFromGitHub} disabled={syncing}>
                 Load from GitHub
+              </button>
+              <button type="button" className="ghost-button" onClick={copyDraftJson}>
+                Copy draft JSON
+              </button>
+            </div>
+            <TextArea
+              label="Import draft JSON"
+              value={importDraftText}
+              placeholder="Paste exported draft JSON here"
+              onChange={setImportDraftText}
+            />
+            <div className="action-row">
+              <button type="button" className="ghost-button" onClick={importDraftJson} disabled={!importDraftText.trim()}>
+                Import draft JSON
               </button>
             </div>
           </section>

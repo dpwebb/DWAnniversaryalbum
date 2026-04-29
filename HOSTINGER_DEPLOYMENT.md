@@ -15,6 +15,12 @@ The repository also includes a `Dockerfile` and `docker-compose.yml` for Hosting
 https://dwmusichub.com
 ```
 
+The Traefik router also accepts:
+
+```text
+https://www.dwmusichub.com
+```
+
 Suno callback URL:
 
 ```text

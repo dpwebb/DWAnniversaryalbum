@@ -15,7 +15,7 @@ services:
       - anniversary-album-data:/app/data
     labels:
       - traefik.enable=true
-      - traefik.http.routers.anniversary-album-maker.rule=Host(`dwmusichub.com`)
+      - traefik.http.routers.anniversary-album-maker.rule=Host(`dwmusichub.com`) || Host(`www.dwmusichub.com`)
       - traefik.http.routers.anniversary-album-maker.entrypoints=websecure
       - traefik.http.routers.anniversary-album-maker.tls=true
       - traefik.http.routers.anniversary-album-maker.tls.certresolver=letsencrypt

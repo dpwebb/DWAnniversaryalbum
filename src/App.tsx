@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import albumDraft from '../album.json';
 import { defaultInputs } from './data/defaults';
 import {
   generateAlbum,
@@ -40,13 +41,14 @@ import type {
 const sampleMemories = 'our first trip together, quiet Sunday mornings, the day we knew this was real';
 const samplePlaces = 'home, the beach, our favorite restaurant';
 const sampleJokes = 'the parking lot debate, our secret phrase, the wrong-turn adventure';
+const bundledDraft = albumDraft as DraftState;
 
 function productionCallbackUrl() {
   return `${window.location.origin}/api/suno/callback`;
 }
 
 export default function App() {
-  const saved = useMemo(() => loadDraft(), []);
+  const saved = useMemo(() => loadDraft() ?? bundledDraft, []);
   const savedGitHubSettings = useMemo(() => loadGitHubSettings(), []);
   const savedApiSettings = useMemo(() => loadApiSettings(), []);
   const [inputs, setInputs] = useState<AlbumInputs>(saved?.inputs ?? defaultInputs);
@@ -229,16 +231,26 @@ export default function App() {
         throw new Error('Draft JSON is missing inputs.');
       }
 
-      setInputs(parsed.inputs);
-      setAlbum(parsed.album ?? null);
-      setGenerationCount(parsed.generationCount ?? 0);
-      setApiResults(parsed.apiResults ?? {});
+      applyDraft({ ...parsed, inputs: parsed.inputs });
       setImportDraftText('');
       setStatus('Imported draft JSON.');
       setError('');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to import draft JSON.');
     }
+  }
+
+  function applyDraft(draft: Partial<DraftState> & { inputs: AlbumInputs }) {
+    setInputs(draft.inputs);
+    setAlbum(draft.album ?? null);
+    setGenerationCount(draft.generationCount ?? 0);
+    setApiResults(draft.apiResults ?? {});
+  }
+
+  function loadBundledDraft() {
+    applyDraft(bundledDraft);
+    setError('');
+    setStatus('Loaded album.json into the local draft.');
   }
 
   function currentDraft(): DraftState {
@@ -618,6 +630,9 @@ export default function App() {
             <div className="action-row">
               <button type="button" className="ghost-button" onClick={importDraftJson} disabled={!importDraftText.trim()}>
                 Import draft JSON
+              </button>
+              <button type="button" className="ghost-button" onClick={loadBundledDraft}>
+                Load album.json
               </button>
             </div>
           </section>

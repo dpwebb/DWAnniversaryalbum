@@ -1,0 +1,115 @@
+﻿name: Deploy production
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: "Commit SHA to deploy for rollback. Leave blank to deploy the current master branch."
+        required: false
+        type: string
+
+concurrency:
+  group: anniversary-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Build check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    name: Deploy to Hostinger VPS
+    runs-on: ubuntu-latest
+    needs: check
+    environment: production
+    steps:
+      - name: Choose commit to deploy
+        id: target
+        run: |
+          if [ -n "${{ inputs.rollback_sha }}" ]; then
+            echo "sha=${{ inputs.rollback_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare SSH
+        env:
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PRODUCTION_SSH_PRIVATE_KEY" > ~/.ssh/production_deploy_key.raw
+          python3 - <<'PY'
+          import base64
+          import binascii
+          from pathlib import Path
+
+          raw_path = Path.home() / ".ssh" / "production_deploy_key.raw"
+          key_path = Path.home() / ".ssh" / "production_deploy_key"
+          key = raw_path.read_text().strip()
+
+          if (key.startswith('"') and key.endswith('"')) or (key.startswith("'") and key.endswith("'")):
+              key = key[1:-1].strip()
+
+          key = key.replace("\\n", "\n")
+          key = key.replace("\r\n", "\n").replace("\r", "\n").strip()
+
+          if "-----BEGIN " not in key:
+              try:
+                  decoded = base64.b64decode(key, validate=True).decode("utf-8").strip()
+                  if "-----BEGIN " in decoded:
+                      key = decoded
+              except (binascii.Error, UnicodeDecodeError):
+                  pass
+
+          if "-----BEGIN " not in key or "PRIVATE KEY-----" not in key:
+              raise SystemExit("PRODUCTION_SSH_PRIVATE_KEY must be an OpenSSH private key or base64-encoded OpenSSH private key.")
+
+          key_path.write_text(key + "\n")
+          raw_path.unlink()
+          PY
+          chmod 600 ~/.ssh/production_deploy_key
+          ssh-keygen -y -f ~/.ssh/production_deploy_key >/dev/null
+          ssh-keyscan -p "$PRODUCTION_SSH_PORT" "$PRODUCTION_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy selected commit
+        env:
+          PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+          PRODUCTION_USER: ${{ secrets.PRODUCTION_USER }}
+          PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT || '22' }}
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          ssh -i ~/.ssh/production_deploy_key -p "$PRODUCTION_SSH_PORT" "$PRODUCTION_USER@$PRODUCTION_HOST" "TARGET_SHA='$TARGET_SHA' bash -s" <<'REMOTE'
+            set -euo pipefail
+
+            cd /opt/anniversary-album-maker/app
+            git fetch --prune origin
+            git checkout "$TARGET_SHA"
+            npm ci
+            npm run build
+            docker rm -f anniversary-album-maker 2>/dev/null || true
+            docker compose up -d --build anniversary-album-maker
+            docker ps --filter name=anniversary-album-maker
+            git log -1 --oneline
+          REMOTE

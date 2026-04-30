@@ -47,8 +47,31 @@ function productionCallbackUrl() {
   return `${window.location.origin}/api/suno/callback`;
 }
 
+function normalizeDraft(draft: Partial<DraftState> & { inputs: AlbumInputs }): DraftState {
+  const generationCount = draft.generationCount ?? 0;
+  let album = draft.album ?? null;
+
+  if (album && (!Array.isArray(album.tracks) || album.tracks.length !== 13)) {
+    const generatedAlbum = generateAlbum(draft.inputs, generationCount);
+    album = {
+      ...generatedAlbum,
+      title: album.title || generatedAlbum.title,
+      concept: album.concept || generatedAlbum.concept,
+      createdAt: album.createdAt || generatedAlbum.createdAt,
+      seed: album.seed || generatedAlbum.seed,
+    };
+  }
+
+  return {
+    inputs: draft.inputs,
+    album,
+    generationCount,
+    apiResults: draft.apiResults ?? {},
+  };
+}
+
 export default function App() {
-  const saved = useMemo(() => loadDraft() ?? bundledDraft, []);
+  const saved = useMemo(() => normalizeDraft(loadDraft() ?? bundledDraft), []);
   const savedGitHubSettings = useMemo(() => loadGitHubSettings(), []);
   const savedApiSettings = useMemo(() => loadApiSettings(), []);
   const [inputs, setInputs] = useState<AlbumInputs>(saved?.inputs ?? defaultInputs);
@@ -241,10 +264,11 @@ export default function App() {
   }
 
   function applyDraft(draft: Partial<DraftState> & { inputs: AlbumInputs }) {
-    setInputs(draft.inputs);
-    setAlbum(draft.album ?? null);
-    setGenerationCount(draft.generationCount ?? 0);
-    setApiResults(draft.apiResults ?? {});
+    const normalizedDraft = normalizeDraft(draft);
+    setInputs(normalizedDraft.inputs);
+    setAlbum(normalizedDraft.album);
+    setGenerationCount(normalizedDraft.generationCount);
+    setApiResults(normalizedDraft.apiResults ?? {});
   }
 
   function loadBundledDraft() {

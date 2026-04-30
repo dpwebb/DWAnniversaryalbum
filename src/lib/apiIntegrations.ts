@@ -44,9 +44,11 @@ export async function createSunoSong(settings: SunoSettings, song: SongPlan): Pr
     instrumental: settings.instrumental,
     model: settings.model,
     callBackUrl: settings.callbackUrl || undefined,
-    prompt: settings.instrumental ? song.musicPrompt.slice(0, 500) : song.lyrics.slice(0, 5000),
-    style: song.genreStyle.slice(0, 1000),
-    title: song.title.slice(0, settings.model === 'V4' || settings.model === 'V4_5ALL' ? 80 : 100),
+    prompt: settings.instrumental
+      ? song.musicPrompt.slice(0, sunoPromptLimit(settings.model))
+      : song.lyrics.slice(0, sunoPromptLimit(settings.model)),
+    style: buildSunoStyle(song).slice(0, sunoStyleLimit(settings.model)),
+    title: song.title.slice(0, sunoTitleLimit(settings.model)),
     negativeTags: settings.negativeTags || undefined,
     vocalGender: settings.vocalGender || undefined,
   };
@@ -199,4 +201,32 @@ function appendOptionalNumber(form: FormData, key: string, value: string): void 
   if (value.trim()) {
     form.append(key, value.trim());
   }
+}
+
+function buildSunoStyle(song: SongPlan): string {
+  return compactSunoText(
+    [
+      song.genreStyle,
+      song.musicPrompt,
+      `Vocal style: ${song.vocalStyle}`,
+      `Instrumentation: ${song.instrumentation}`,
+      `Theme: ${song.emotionalPurpose}`,
+    ].join('. '),
+  );
+}
+
+function compactSunoText(value: string): string {
+  return value.replace(/\s+/g, ' ').replace(/\s+\./g, '.').trim();
+}
+
+function sunoPromptLimit(model: SunoSettings['model']): number {
+  return model === 'V4' ? 3000 : 5000;
+}
+
+function sunoStyleLimit(model: SunoSettings['model']): number {
+  return model === 'V4' ? 200 : 1000;
+}
+
+function sunoTitleLimit(model: SunoSettings['model']): number {
+  return model === 'V4' || model === 'V4_5ALL' ? 80 : 100;
 }

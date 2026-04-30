@@ -20,9 +20,10 @@ export function hashText(value: string): number {
 
 export function sanitizeWords(text: string, avoidWords: string[]): string {
   return avoidWords.reduce((current, word) => {
-    if (!word.trim()) return current;
-    const escaped = word.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return current.replace(new RegExp(escaped, 'gi'), '[kept private]');
+    const normalizedWord = word.trim().replace(/^[^\w]+|[^\w]+$/g, '');
+    if (!normalizedWord) return current;
+    const escaped = normalizedWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return current.replace(new RegExp(`(^|\\W)(${escaped})(?=\\W|$)`, 'gi'), '$1[kept private]');
   }, text);
 }
 

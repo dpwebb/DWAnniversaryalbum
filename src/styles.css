@@ -373,7 +373,8 @@ dd {
 }
 
 pre,
-.prompt-box {
+.prompt-box,
+.track-textarea {
   background: #fbf7f3;
   border: 1px solid #eadbd5;
   border-radius: 8px;
@@ -385,6 +386,16 @@ pre,
 
 .prompt-box {
   white-space: normal;
+}
+
+.track-textarea {
+  display: block;
+  min-height: 300px;
+  resize: vertical;
+}
+
+.prompt-editor {
+  min-height: 140px;
 }
 
 .check-field {

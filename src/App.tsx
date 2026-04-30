@@ -165,6 +165,17 @@ export default function App() {
     );
   }
 
+  function updateTrackText(trackId: number, key: 'lyrics' | 'musicPrompt', value: string) {
+    setAlbum((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        tracks: current.tracks.map((track) => (track.id === trackId ? { ...track, [key]: value } : track)),
+      };
+    });
+    setError('');
+  }
+
   async function copyAlbum() {
     if (!album) return;
     try {
@@ -786,7 +797,7 @@ export default function App() {
               <div className="track-list">
                 {album.tracks.map((track) => (
                   <div className="track-stack" key={track.id}>
-                    <TrackCard track={track} onAction={handleTrackAction} />
+                    <TrackCard track={track} onAction={handleTrackAction} onEdit={updateTrackText} />
                     <ApiTrackPanel
                       track={track}
                       result={apiResults[track.id]}
@@ -841,9 +852,11 @@ function TextArea({ label, value, placeholder, onChange }: FieldProps) {
 function TrackCard({
   track,
   onAction,
+  onEdit,
 }: {
   track: SongPlan;
   onAction: (trackId: number, action: 'song' | 'lyrics' | 'prompt') => void;
+  onEdit: (trackId: number, key: 'lyrics' | 'musicPrompt', value: string) => void;
 }) {
   const [open, setOpen] = useState(track.id === 1);
 
@@ -895,11 +908,21 @@ function TrackCard({
           </dl>
           <section>
             <h3>Original lyrics draft</h3>
-            <pre>{track.lyrics}</pre>
+            <textarea
+              className="track-textarea lyrics-editor"
+              aria-label={`Original lyrics draft for ${track.title}`}
+              value={track.lyrics}
+              onChange={(event) => onEdit(track.id, 'lyrics', event.target.value)}
+            />
           </section>
           <section>
             <h3>AI music tool prompt</h3>
-            <p className="prompt-box">{track.musicPrompt}</p>
+            <textarea
+              className="track-textarea prompt-editor"
+              aria-label={`AI music tool prompt for ${track.title}`}
+              value={track.musicPrompt}
+              onChange={(event) => onEdit(track.id, 'musicPrompt', event.target.value)}
+            />
           </section>
         </div>
       ) : null}

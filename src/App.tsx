@@ -1561,6 +1561,9 @@ function ApiTrackPanel({
   const sunoTakes = sunoTakeItems(visibleSuno);
   const sunoBusy = busy === `suno-${track.id}`;
   const sunoStatus = result?.suno?.status ?? '';
+  const sunoNeedsAttention = ['ERROR', 'FAILED'].includes(sunoStatus.toUpperCase());
+  const sunoStatusText = sunoBusy ? 'Sending to Suno' : result?.suno?.status ? friendlyStatus(result.suno.status) : 'Not sent';
+  const sunoStatusDetail = sunoNeedsAttention && result?.suno?.message ? result.suno.message : '';
   const showWaitingForAudio =
     result?.suno &&
     !sunoTakes.length &&
@@ -1602,7 +1605,9 @@ function ApiTrackPanel({
       <div className="api-service">
         <div>
           <strong>Suno</strong>
-          <span>{sunoBusy ? 'Sending to Suno' : result?.suno?.status ? friendlyStatus(result.suno.status) : 'Not sent'}</span>
+          <span className={sunoNeedsAttention ? 'attention-message' : undefined}>
+            {sunoStatusDetail ? `${sunoStatusText}: ${sunoStatusDetail}` : sunoStatusText}
+          </span>
         </div>
         <div className="track-actions">
           <button type="button" onClick={() => onSunoGenerate(track)} disabled={busy === `suno-${track.id}`}>
@@ -1627,7 +1632,7 @@ function ApiTrackPanel({
       {result?.suno ? (
         <div className="api-result">
           {result.suno.taskId ? <span>Suno reference: {result.suno.taskId}</span> : null}
-          {result.suno.message ? <span>{result.suno.message}</span> : null}
+          {result.suno.message && !sunoStatusDetail ? <span>{result.suno.message}</span> : null}
           {sunoTakes.map((item) => (
             <span className="take-pill" key={item.key}>
               <a href={item.url} target="_blank" rel="noreferrer">

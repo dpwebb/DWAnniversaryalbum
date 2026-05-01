@@ -95,7 +95,7 @@ export async function createSunoSong(settings: SunoSettings, song: SongPlan, lyr
   const payload = (await response.json()) as SunoGenerateResponse;
   const taskId = sunoTaskIdFromPayload(payload);
   if (!response.ok || payload.code !== 200 || !taskId) {
-    throw new Error(payload.msg || payload.error || 'Suno did not return a task ID.');
+    throw new Error(sunoErrorMessage(payload, 'Suno did not return a task ID.'));
   }
 
   return taskId;
@@ -167,7 +167,7 @@ export async function replaceSunoSection(settings: SunoSettings, request: SunoRe
   const payload = (await response.json()) as SunoGenerateResponse;
   const taskId = sunoTaskIdFromPayload(payload);
   if (!response.ok || payload.code !== 200 || !taskId) {
-    throw new Error(payload.msg || payload.error || 'Suno did not return a replacement task ID.');
+    throw new Error(sunoErrorMessage(payload, 'Suno did not return a replacement task ID.'));
   }
 
   return taskId;
@@ -192,7 +192,7 @@ export async function getSunoSong(settings: SunoSettings, taskId: string) {
   const payload = (await response.json()) as SunoRecordResponse;
 
   if (!response.ok || payload.code !== 200 || !payload.data) {
-    throw new Error(payload.msg || payload.error || 'Unable to fetch Suno task status.');
+    throw new Error(sunoErrorMessage(payload, 'Unable to fetch Suno task status.'));
   }
 
   const tracks = normalizeSunoTracks(payload.data.response?.sunoData ?? []);
@@ -229,6 +229,11 @@ function sunoTaskIdFromPayload(payload: SunoGenerateResponse): string {
   }
 
   return (payload.data?.taskId ?? payload.data?.task_id ?? payload.data?.id ?? '').trim();
+}
+
+function sunoErrorMessage(payload: { code?: number; msg?: string; error?: string }, fallback: string): string {
+  const message = payload.msg || payload.error || fallback;
+  return payload.code && payload.code !== 200 ? `Suno ${payload.code}: ${message}` : message;
 }
 
 export async function fetchSunoCallbacks(callbackUrl: string, taskId?: string): Promise<SunoCallbackRecord[]> {

@@ -30,6 +30,7 @@ export type AlbumPlan = {
   title: string;
   concept: string;
   tracks: SongPlan[];
+  tracksEdited?: boolean;
   createdAt: string;
   seed: number;
 };

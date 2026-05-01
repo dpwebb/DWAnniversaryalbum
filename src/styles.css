@@ -295,6 +295,11 @@ textarea:focus {
   font-weight: 800;
 }
 
+.track-actions .danger-button {
+  background: #8a1f2d;
+  color: #fffafa;
+}
+
 .ghost-button {
   background: #242c37;
   color: #f3e7d8;
@@ -628,6 +633,10 @@ pre,
   display: grid;
   min-height: 560px;
   text-align: center;
+}
+
+.compact-empty {
+  min-height: 260px;
 }
 
 .empty-state p {

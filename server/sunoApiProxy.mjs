@@ -54,8 +54,23 @@ async function proxySunoRecordInfo(req, res, requestUrl) {
 }
 
 async function forwardSunoRequest(res, url, init) {
-  const response = await fetch(url, init);
-  const text = await response.text();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60_000);
+
+  let response;
+  let text;
+
+  try {
+    response = await fetch(url, { ...init, signal: controller.signal });
+    text = await response.text();
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw httpError(504, 'Timed out waiting for Suno. Try again in a minute.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   res.statusCode = response.status;
   res.setHeader('Content-Type', response.headers.get('content-type') ?? 'application/json; charset=utf-8');

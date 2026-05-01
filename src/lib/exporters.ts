@@ -1,6 +1,8 @@
 import type { AlbumInputs, AlbumPlan, SongPlan } from '../types';
 
 export function albumToMarkdown(inputs: AlbumInputs, album: AlbumPlan): string {
+  const trackList = album.tracks.length ? album.tracks.flatMap((track) => songToMarkdown(track)) : ['_No tracks selected._'];
+
   return [
     `# ${album.title}`,
     '',
@@ -15,12 +17,12 @@ export function albumToMarkdown(inputs: AlbumInputs, album: AlbumPlan): string {
     '',
     '## Track List',
     '',
-    ...album.tracks.flatMap((track) => songToMarkdown(track)),
+    ...trackList,
   ].join('\n');
 }
 
 export function albumToHtml(inputs: AlbumInputs, album: AlbumPlan): string {
-  const tracks = album.tracks.map(songToHtml).join('\n');
+  const tracks = album.tracks.length ? album.tracks.map(songToHtml).join('\n') : '<p><em>No tracks selected.</em></p>';
   return `<!doctype html>
 <html lang="en">
 <head>

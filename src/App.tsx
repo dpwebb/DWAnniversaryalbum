@@ -82,7 +82,7 @@ function normalizeDraft(draft: DraftPayload): DraftState {
   const generationCount = draft.generationCount ?? 0;
   let album = draft.album ?? null;
 
-  if (album && (!Array.isArray(album.tracks) || album.tracks.length !== 13)) {
+  if (album && (!Array.isArray(album.tracks) || (album.tracks.length === 0 && !album.tracksEdited))) {
     const generatedAlbum = generateAlbum(inputs, generationCount);
     album = {
       ...generatedAlbum,
@@ -282,6 +282,28 @@ export default function App() {
     setError('');
   }
 
+  function deleteTrack(trackId: number) {
+    if (!album) return;
+    const track = album.tracks.find((item) => item.id === trackId);
+    if (!track) return;
+
+    const confirmed = window.confirm(`Delete "${track.title}" from this album draft?`);
+    if (!confirmed) return;
+
+    setAlbum({
+      ...album,
+      tracks: album.tracks.filter((item) => item.id !== trackId),
+      tracksEdited: true,
+    });
+    setApiResults((current) => {
+      const next = { ...current };
+      delete next[trackId];
+      return next;
+    });
+    setError('');
+    setStatus(`Deleted song ${trackId}: ${track.title}.`);
+  }
+
   function setTrackLyricsLocked(trackId: number, lyricsLocked: boolean) {
     setAlbum((current) => {
       if (!current) return current;
@@ -441,8 +463,24 @@ export default function App() {
   }
 
   async function sendTrackToSuno(track: SongPlan) {
+    const startedAt = new Date().toISOString();
     setApiBusy(`suno-${track.id}`);
     setError('');
+    setApiResults((current) => ({
+      ...current,
+      [track.id]: {
+        ...current[track.id],
+        suno: {
+          taskId: '',
+          status: 'SENDING',
+          message: 'Contacting Suno. This can take a few seconds.',
+          audioUrls: [],
+          streamUrls: [],
+          updatedAt: startedAt,
+        },
+      },
+    }));
+
     try {
       const taskId = await createSunoSong(apiSettings.suno, track, inputs.lyricInstructions);
       setApiResults((current) => ({
@@ -461,7 +499,22 @@ export default function App() {
       }));
       setStatus(`Sent song ${track.id} to Suno.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to send this song to Suno.');
+      const message = caught instanceof Error ? caught.message : 'Unable to send this song to Suno.';
+      setApiResults((current) => ({
+        ...current,
+        [track.id]: {
+          ...current[track.id],
+          suno: {
+            taskId: '',
+            status: 'ERROR',
+            message,
+            audioUrls: [],
+            streamUrls: [],
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      }));
+      setError(message);
     } finally {
       setApiBusy('');
     }
@@ -1051,29 +1104,38 @@ export default function App() {
                   Backup file
                 </button>
               </div>
-              <div className="track-list">
-                {album.tracks.map((track) => (
-                  <div className="track-stack" key={track.id}>
-                    <TrackCard
-                      track={track}
-                      onAction={handleTrackAction}
-                      onEdit={updateTrackText}
-                      onLyricsLockChange={setTrackLyricsLocked}
-                    />
-                    <ApiTrackPanel
-                      track={track}
-                      result={apiResults[track.id]}
-                      busy={apiBusy}
-                      onSunoGenerate={sendTrackToSuno}
-                      onSunoCheck={checkSunoStatus}
-                      onSunoReplace={replaceSunoTrackSection}
-                      onSunoReplacementCheck={checkSunoReplacementStatus}
-                      onKitsConvert={sendTrackToKits}
-                      onKitsCheck={checkKitsStatus}
-                    />
-                  </div>
-                ))}
-              </div>
+              {album.tracks.length ? (
+                <div className="track-list">
+                  {album.tracks.map((track) => (
+                    <div className="track-stack" key={track.id}>
+                      <TrackCard
+                        track={track}
+                        onAction={handleTrackAction}
+                        onEdit={updateTrackText}
+                        onDelete={deleteTrack}
+                        onLyricsLockChange={setTrackLyricsLocked}
+                      />
+                      <ApiTrackPanel
+                        track={track}
+                        result={apiResults[track.id]}
+                        busy={apiBusy}
+                        onSunoGenerate={sendTrackToSuno}
+                        onSunoCheck={checkSunoStatus}
+                        onSunoReplace={replaceSunoTrackSection}
+                        onSunoReplacementCheck={checkSunoReplacementStatus}
+                        onKitsConvert={sendTrackToKits}
+                        onKitsCheck={checkKitsStatus}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state compact-empty">
+                  <p className="eyebrow">Track list empty</p>
+                  <h2>No songs remain on this draft.</h2>
+                  <p>Generate a fresh album when you want to rebuild the track list.</p>
+                </div>
+              )}
             </>
           ) : (
             <div className="empty-state">
@@ -1144,7 +1206,7 @@ function displayAudioUrls(result?: { audioUrls: string[]; tracks?: SunoGenerated
 function friendlyStatus(status: string): string {
   const normalized = status.trim().toUpperCase();
   if (!normalized) return 'Waiting';
-  if (['SUBMITTED', 'PENDING', 'QUEUED', 'CREATE_TASK', 'TEXT_SUCCESS'].includes(normalized)) return 'In progress';
+  if (['SENDING', 'SUBMITTED', 'PENDING', 'QUEUED', 'CREATE_TASK', 'TEXT_SUCCESS'].includes(normalized)) return 'In progress';
   if (['SUCCESS', 'COMPLETE', 'COMPLETED', 'CALLBACK_COMPLETE'].includes(normalized)) return 'Ready';
   if (['FAILED', 'ERROR'].includes(normalized)) return 'Needs attention';
   if (normalized === 'UNKNOWN') return 'Waiting';
@@ -1203,11 +1265,13 @@ function TrackCard({
   track,
   onAction,
   onEdit,
+  onDelete,
   onLyricsLockChange,
 }: {
   track: SongPlan;
   onAction: (trackId: number, action: 'song' | 'lyrics' | 'prompt') => void;
   onEdit: (trackId: number, key: EditableTrackTextKey, value: string) => void;
+  onDelete: (trackId: number) => void;
   onLyricsLockChange: (trackId: number, lyricsLocked: boolean) => void;
 }) {
   const [open, setOpen] = useState(track.id === 1);
@@ -1245,6 +1309,9 @@ function TrackCard({
           </button>
           <button type="button" onClick={() => onAction(track.id, 'prompt')}>
             Refresh brief
+          </button>
+          <button type="button" className="danger-button" onClick={() => onDelete(track.id)}>
+            Delete track
           </button>
         </div>
       </header>
@@ -1353,6 +1420,12 @@ function ApiTrackPanel({
   const selectedSunoTrack = sunoTracks.find((item) => item.id === replaceForm.sourceAudioId) ?? sunoTracks[0];
   const firstAudioId = sunoTracks[0]?.id ?? '';
   const sunoAudioLinks = displayAudioUrls(result?.suno);
+  const sunoBusy = busy === `suno-${track.id}`;
+  const sunoStatus = result?.suno?.status ?? '';
+  const showWaitingForAudio =
+    result?.suno &&
+    !sunoAudioLinks.length &&
+    !['SENDING', 'SUBMITTED', 'ERROR', 'FAILED'].includes(sunoStatus.toUpperCase());
 
   useEffect(() => {
     if (!replaceForm.sourceAudioId && firstAudioId) {
@@ -1390,11 +1463,11 @@ function ApiTrackPanel({
       <div className="api-service">
         <div>
           <strong>Suno</strong>
-          <span>{result?.suno?.status ? friendlyStatus(result.suno.status) : 'Not sent'}</span>
+          <span>{sunoBusy ? 'Sending to Suno' : result?.suno?.status ? friendlyStatus(result.suno.status) : 'Not sent'}</span>
         </div>
         <div className="track-actions">
           <button type="button" onClick={() => onSunoGenerate(track)} disabled={busy === `suno-${track.id}`}>
-            Send to Suno
+            {sunoBusy ? 'Sending...' : 'Send to Suno'}
           </button>
           <button
             type="button"
@@ -1414,13 +1487,14 @@ function ApiTrackPanel({
       </div>
       {result?.suno ? (
         <div className="api-result">
-          <span>Suno reference: {result.suno.taskId}</span>
+          {result.suno.taskId ? <span>Suno reference: {result.suno.taskId}</span> : null}
+          {result.suno.message ? <span>{result.suno.message}</span> : null}
           {sunoAudioLinks.map((url, index) => (
             <a key={url} href={url} target="_blank" rel="noreferrer">
               Audio {index + 1}
             </a>
           ))}
-          {!sunoAudioLinks.length && result.suno.status !== 'SUBMITTED' ? (
+          {showWaitingForAudio ? (
             <span>Finished audio is not ready yet. Refresh results or bring in finished songs.</span>
           ) : null}
         </div>

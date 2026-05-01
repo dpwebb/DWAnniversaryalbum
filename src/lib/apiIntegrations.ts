@@ -7,7 +7,7 @@ const KITS_BASE_URL = 'https://arpeggi.io/api/kits/v1';
 type SunoGenerateResponse = {
   code: number;
   msg: string;
-  data?: { taskId?: string };
+  data?: { taskId?: string; task_id?: string; id?: string } | string;
   error?: string;
 };
 
@@ -83,7 +83,7 @@ export async function createSunoSong(settings: SunoSettings, song: SongPlan, lyr
     vocalGender: settings.vocalGender || undefined,
   };
 
-  const response = await fetch(`${SUNO_PROXY_BASE_PATH}/generate`, {
+  const response = await fetchSunoProxy(`${SUNO_PROXY_BASE_PATH}/generate`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${settings.token}`,
@@ -93,11 +93,12 @@ export async function createSunoSong(settings: SunoSettings, song: SongPlan, lyr
   });
 
   const payload = (await response.json()) as SunoGenerateResponse;
-  if (!response.ok || payload.code !== 200 || !payload.data?.taskId) {
+  const taskId = sunoTaskIdFromPayload(payload);
+  if (!response.ok || payload.code !== 200 || !taskId) {
     throw new Error(payload.msg || payload.error || 'Suno did not return a task ID.');
   }
 
-  return payload.data.taskId;
+  return taskId;
 }
 
 export async function replaceSunoSection(settings: SunoSettings, request: SunoReplaceSectionRequest): Promise<string> {
@@ -154,7 +155,7 @@ export async function replaceSunoSection(settings: SunoSettings, request: SunoRe
     callBackUrl: settings.callbackUrl || undefined,
   };
 
-  const response = await fetch(`${SUNO_PROXY_BASE_PATH}/generate/replace-section`, {
+  const response = await fetchSunoProxy(`${SUNO_PROXY_BASE_PATH}/generate/replace-section`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${settings.token}`,
@@ -164,11 +165,12 @@ export async function replaceSunoSection(settings: SunoSettings, request: SunoRe
   });
 
   const payload = (await response.json()) as SunoGenerateResponse;
-  if (!response.ok || payload.code !== 200 || !payload.data?.taskId) {
+  const taskId = sunoTaskIdFromPayload(payload);
+  if (!response.ok || payload.code !== 200 || !taskId) {
     throw new Error(payload.msg || payload.error || 'Suno did not return a replacement task ID.');
   }
 
-  return payload.data.taskId;
+  return taskId;
 }
 
 export async function getSunoSong(settings: SunoSettings, taskId: string) {
@@ -182,7 +184,7 @@ export async function getSunoSong(settings: SunoSettings, taskId: string) {
   const url = new URL(`${SUNO_PROXY_BASE_PATH}/generate/record-info`, window.location.origin);
   url.searchParams.set('taskId', taskId.trim());
 
-  const response = await fetch(url, {
+  const response = await fetchSunoProxy(url, {
     headers: {
       Authorization: `Bearer ${settings.token}`,
     },
@@ -203,6 +205,30 @@ export async function getSunoSong(settings: SunoSettings, taskId: string) {
     imageUrls: imageUrlsFromTracks(tracks),
     tracks,
   };
+}
+
+async function fetchSunoProxy(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 60_000);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Timed out waiting for Suno. Try again in a minute.');
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function sunoTaskIdFromPayload(payload: SunoGenerateResponse): string {
+  if (typeof payload.data === 'string') {
+    return payload.data.trim();
+  }
+
+  return (payload.data?.taskId ?? payload.data?.task_id ?? payload.data?.id ?? '').trim();
 }
 
 export async function fetchSunoCallbacks(callbackUrl: string, taskId?: string): Promise<SunoCallbackRecord[]> {

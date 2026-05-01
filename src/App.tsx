@@ -47,6 +47,16 @@ const samplePlaces = 'home, the beach, our favorite restaurant';
 const sampleJokes = 'the parking lot debate, our secret phrase, the wrong-turn adventure';
 const bundledDraft = albumDraft as DraftState;
 type DraftPayload = Partial<DraftState> & { inputs: Partial<AlbumInputs> };
+type EditableTrackTextKey =
+  | 'title'
+  | 'genreStyle'
+  | 'emotionalPurpose'
+  | 'shortDescription'
+  | 'dedicationNote'
+  | 'vocalStyle'
+  | 'instrumentation'
+  | 'lyrics'
+  | 'musicPrompt';
 type SunoSectionReplacementInput = {
   sourceTaskId: string;
   sourceAudioId: string;
@@ -238,7 +248,7 @@ export default function App() {
     );
   }
 
-  function updateTrackText(trackId: number, key: 'lyrics' | 'musicPrompt', value: string) {
+  function updateTrackText(trackId: number, key: EditableTrackTextKey, value: string) {
     setAlbum((current) => {
       if (!current) return current;
       return {
@@ -1107,7 +1117,7 @@ function TrackCard({
 }: {
   track: SongPlan;
   onAction: (trackId: number, action: 'song' | 'lyrics' | 'prompt') => void;
-  onEdit: (trackId: number, key: 'lyrics' | 'musicPrompt', value: string) => void;
+  onEdit: (trackId: number, key: EditableTrackTextKey, value: string) => void;
   onLyricsLockChange: (trackId: number, lyricsLocked: boolean) => void;
 }) {
   const [open, setOpen] = useState(track.id === 1);
@@ -1115,13 +1125,27 @@ function TrackCard({
   return (
     <article className="track-card">
       <header className="track-header">
-        <button type="button" className="track-toggle" onClick={() => setOpen((current) => !current)}>
-          <span className="track-number">{String(track.id).padStart(2, '0')}</span>
-          <span>
-            <strong>{track.title}</strong>
-            <small>{track.genreStyle}</small>
-          </span>
-        </button>
+        <div className="track-title-area">
+          <button
+            type="button"
+            className="track-toggle"
+            aria-expanded={open}
+            aria-label={`${open ? 'Collapse' : 'Expand'} track ${track.id}`}
+            onClick={() => setOpen((current) => !current)}
+          >
+            <span className="track-number">{String(track.id).padStart(2, '0')}</span>
+          </button>
+          <div className="track-header-fields">
+            <label className="inline-field">
+              <span>Title</span>
+              <input value={track.title} onChange={(event) => onEdit(track.id, 'title', event.target.value)} />
+            </label>
+            <label className="inline-field">
+              <span>Genre</span>
+              <input value={track.genreStyle} onChange={(event) => onEdit(track.id, 'genreStyle', event.target.value)} />
+            </label>
+          </div>
+        </div>
         <div className="track-actions">
           <button type="button" onClick={() => onAction(track.id, 'song')}>
             Song
@@ -1136,28 +1160,38 @@ function TrackCard({
       </header>
       {open ? (
         <div className="track-body">
-          <dl>
-            <div>
-              <dt>Emotional purpose</dt>
-              <dd>{track.emotionalPurpose}</dd>
-            </div>
-            <div>
-              <dt>Description</dt>
-              <dd>{track.shortDescription}</dd>
-            </div>
-            <div>
-              <dt>Dedication</dt>
-              <dd>{track.dedicationNote}</dd>
-            </div>
-            <div>
-              <dt>Vocal style</dt>
-              <dd>{track.vocalStyle}</dd>
-            </div>
-            <div>
-              <dt>Instrumentation</dt>
-              <dd>{track.instrumentation}</dd>
-            </div>
-          </dl>
+          <div className="metadata-grid">
+            <TextArea
+              label="Emotional purpose"
+              value={track.emotionalPurpose}
+              placeholder="What this track should express"
+              onChange={(value) => onEdit(track.id, 'emotionalPurpose', value)}
+            />
+            <TextArea
+              label="Description"
+              value={track.shortDescription}
+              placeholder="Track description"
+              onChange={(value) => onEdit(track.id, 'shortDescription', value)}
+            />
+            <TextArea
+              label="Dedication"
+              value={track.dedicationNote}
+              placeholder="Dedication note"
+              onChange={(value) => onEdit(track.id, 'dedicationNote', value)}
+            />
+            <TextArea
+              label="Vocal style"
+              value={track.vocalStyle}
+              placeholder="Vocal style"
+              onChange={(value) => onEdit(track.id, 'vocalStyle', value)}
+            />
+            <TextArea
+              label="Instrumentation"
+              value={track.instrumentation}
+              placeholder="Instrumentation"
+              onChange={(value) => onEdit(track.id, 'instrumentation', value)}
+            />
+          </div>
           <section>
             <div className="section-heading">
               <div>

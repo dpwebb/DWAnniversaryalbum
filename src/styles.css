@@ -308,15 +308,21 @@ textarea:focus {
   padding: 14px;
 }
 
+.track-title-area {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: min(100%, 440px);
+}
+
 .track-toggle {
   align-items: center;
   background: transparent;
   color: #3d2e2a;
-  display: flex;
-  flex: 1;
-  gap: 12px;
-  justify-content: flex-start;
-  min-width: 220px;
+  display: inline-flex;
+  justify-content: center;
+  min-width: 42px;
   padding: 0;
   text-align: left;
 }
@@ -334,14 +340,26 @@ textarea:focus {
   width: 42px;
 }
 
-.track-toggle strong,
-.track-toggle small {
-  display: block;
+.track-header-fields {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(120px, 0.8fr);
 }
 
-.track-toggle small {
-  color: #73615b;
-  margin-top: 2px;
+.inline-field {
+  display: grid;
+  gap: 4px;
+}
+
+.inline-field span {
+  color: #7d2e3b;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.inline-field input {
+  min-height: 42px;
 }
 
 .track-body {
@@ -351,23 +369,18 @@ textarea:focus {
   padding: 16px;
 }
 
-dl {
+.metadata-grid {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 0;
 }
 
-dt {
-  color: #7d2e3b;
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-transform: uppercase;
+.metadata-grid .field:last-child {
+  grid-column: 1 / -1;
 }
 
-dd {
-  color: #4b3b36;
-  margin: 4px 0 0;
+.metadata-grid textarea {
+  min-height: 82px;
 }
 
 .track-body h3 {
@@ -581,7 +594,8 @@ pre,
   .hero-panel,
   .field-grid.two,
   .field-grid.three,
-  dl {
+  .metadata-grid,
+  .track-header-fields {
     grid-template-columns: 1fr;
   }
 
@@ -590,6 +604,11 @@ pre,
   .track-header,
   .section-heading {
     display: grid;
+  }
+
+  .track-title-area {
+    grid-template-columns: auto minmax(0, 1fr);
+    min-width: 0;
   }
 
   .album-panel,

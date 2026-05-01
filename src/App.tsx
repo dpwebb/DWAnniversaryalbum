@@ -123,7 +123,7 @@ export default function App() {
       owner: '',
       repo: '',
       branch: 'main',
-      path: 'anniversary-album-draft.json',
+      path: 'anniversary-album-session.json',
       token: '',
     },
   );
@@ -150,7 +150,7 @@ export default function App() {
   const [syncing, setSyncing] = useState(false);
   const [apiBusy, setApiBusy] = useState('');
   const [importDraftText, setImportDraftText] = useState('');
-  const [status, setStatus] = useState('Draft autosaves locally and can sync to GitHub.');
+  const [status, setStatus] = useState('Your session is saved on this computer.');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -191,7 +191,7 @@ export default function App() {
       const nextCount = generationCount + 1;
       setAlbum(generateAlbum(inputs, nextCount));
       setGenerationCount(nextCount);
-      setStatus('Generated a fresh 13-song album plan.');
+      setStatus('Built a fresh 13-song studio session.');
       setError('');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to generate the album.');
@@ -207,7 +207,7 @@ export default function App() {
     const nextCount = generationCount + 1;
     setAlbum(regenerateTitle(inputs, album, nextCount));
     setGenerationCount(nextCount);
-    setStatus('Regenerated the album title.');
+    setStatus('Refreshed the album name.');
   }
 
   function handleTrackAction(trackId: number, action: 'song' | 'lyrics' | 'prompt') {
@@ -240,11 +240,11 @@ export default function App() {
     setStatus(
       action === 'song'
         ? currentTrack?.lyricsLocked
-          ? `Regenerated track ${trackId} while preserving locked lyrics.`
-          : `Regenerated track ${trackId}.`
+          ? `Refreshed song ${trackId} while keeping the protected lyrics.`
+          : `Refreshed song ${trackId}.`
         : action === 'lyrics'
-          ? `Regenerated lyrics for track ${trackId}.`
-          : `Regenerated the music prompt for track ${trackId}.`,
+          ? `Rewrote lyrics for song ${trackId}.`
+          : `Refreshed the Suno brief for song ${trackId}.`,
     );
   }
 
@@ -261,7 +261,7 @@ export default function App() {
       };
     });
     if (key === 'lyrics' && album?.tracks.find((track) => track.id === trackId)?.lyricsLocked) {
-      setError('Unlock the lyrics before editing them.');
+      setError('Use Edit lyrics before changing protected lyrics.');
       return;
     }
     setError('');
@@ -276,30 +276,30 @@ export default function App() {
       };
     });
     setError('');
-    setStatus(lyricsLocked ? `Locked lyrics for track ${trackId}.` : `Unlocked lyrics for track ${trackId}.`);
+    setStatus(lyricsLocked ? `Protected lyrics for song ${trackId}.` : `Lyrics for song ${trackId} are open for edits.`);
   }
 
   async function copyAlbum() {
     if (!album) return;
     try {
       await navigator.clipboard.writeText(albumToMarkdown(inputs, album));
-      setStatus('Copied the album plan to the clipboard.');
+      setStatus('Copied the session sheet.');
       setError('');
     } catch {
-      setError('Clipboard access was blocked by the browser. Use Markdown export instead.');
+      setError('The browser blocked clipboard access. Use Download lyric sheet instead.');
     }
   }
 
   function exportMarkdown() {
     if (!album) return;
     downloadText('anniversary-album-plan.md', albumToMarkdown(inputs, album), 'text/markdown;charset=utf-8');
-    setStatus('Exported Markdown.');
+    setStatus('Downloaded the lyric sheet.');
   }
 
   function exportHtml() {
     if (!album) return;
     downloadText('anniversary-album-plan.html', albumToHtml(inputs, album), 'text/html;charset=utf-8');
-    setStatus('Exported PDF-ready HTML.');
+    setStatus('Downloaded the print-ready page.');
   }
 
   function exportJson() {
@@ -309,16 +309,16 @@ export default function App() {
       JSON.stringify(currentDraft(), null, 2),
       'application/json;charset=utf-8',
     );
-    setStatus('Exported JSON.');
+    setStatus('Downloaded the backup file.');
   }
 
   async function copyDraftJson() {
     try {
       await navigator.clipboard.writeText(JSON.stringify(currentDraft(), null, 2));
-      setStatus('Copied draft JSON to the clipboard.');
+      setStatus('Copied the backup text.');
       setError('');
     } catch {
-      setError('Clipboard access was blocked by the browser.');
+      setError('The browser blocked clipboard access.');
     }
   }
 
@@ -329,15 +329,15 @@ export default function App() {
         album?: AlbumPlan | null;
       };
       if (!parsed.inputs) {
-        throw new Error('Draft JSON is missing inputs.');
+        throw new Error('Backup text is missing the story notes.');
       }
 
       applyDraft({ ...parsed, inputs: parsed.inputs });
       setImportDraftText('');
-      setStatus('Imported draft JSON.');
+      setStatus('Restored the backup text.');
       setError('');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to import draft JSON.');
+      setError(caught instanceof Error ? caught.message : 'Unable to restore that backup text.');
     }
   }
 
@@ -352,7 +352,7 @@ export default function App() {
   function loadBundledDraft() {
     applyDraft(bundledDraft);
     setError('');
-    setStatus('Loaded album.json into the local draft.');
+    setStatus('Loaded the saved album session.');
   }
 
   function currentDraft(): DraftState {
@@ -365,7 +365,7 @@ export default function App() {
     setAlbum(null);
     setGenerationCount(0);
     setError('');
-    setStatus('Cleared the local draft.');
+    setStatus('Started a clean session.');
   }
 
   async function saveToGitHub() {
@@ -379,9 +379,9 @@ export default function App() {
     setError('');
     try {
       await saveDraftToGitHub(githubSettings, { inputs, album, generationCount, apiResults });
-      setStatus(`Saved draft to ${githubSettings.owner}/${githubSettings.repo}/${githubSettings.path}.`);
+      setStatus(`Saved this session to ${githubSettings.owner}/${githubSettings.repo}/${githubSettings.path}.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to save draft to GitHub.');
+      setError(caught instanceof Error ? caught.message : 'Unable to save this session.');
     } finally {
       setSyncing(false);
     }
@@ -402,9 +402,9 @@ export default function App() {
       setAlbum(draft.album);
       setGenerationCount(draft.generationCount);
       setApiResults(draft.apiResults ?? {});
-      setStatus(`Loaded draft from ${githubSettings.owner}/${githubSettings.repo}/${githubSettings.path}.`);
+      setStatus(`Loaded your session from ${githubSettings.owner}/${githubSettings.repo}/${githubSettings.path}.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to load draft from GitHub.');
+      setError(caught instanceof Error ? caught.message : 'Unable to load that saved session.');
     } finally {
       setSyncing(false);
     }
@@ -422,16 +422,16 @@ export default function App() {
           suno: {
             taskId,
             status: 'SUBMITTED',
-            message: 'Suno task created. Check status after the service has processed it.',
+            message: 'Suno is making this song. Refresh results in a bit.',
             audioUrls: [],
             streamUrls: [],
             updatedAt: new Date().toISOString(),
           },
         },
       }));
-      setStatus(`Submitted track ${track.id} to Suno.`);
+      setStatus(`Sent song ${track.id} to Suno.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to submit the track to Suno.');
+      setError(caught instanceof Error ? caught.message : 'Unable to send this song to Suno.');
     } finally {
       setApiBusy('');
     }
@@ -450,9 +450,9 @@ export default function App() {
           suno: { ...result, updatedAt: new Date().toISOString() },
         },
       }));
-      setStatus(`Updated Suno status for track ${trackId}: ${result.status}.`);
+      setStatus(`Refreshed Suno results for song ${trackId}: ${friendlyStatus(result.status)}.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to check Suno status.');
+      setError(caught instanceof Error ? caught.message : 'Unable to refresh Suno results.');
     } finally {
       setApiBusy('');
     }
@@ -473,7 +473,7 @@ export default function App() {
         tags: request.tags,
         title: request.title,
         status: 'SUBMITTED',
-        message: 'Suno replacement task created. Check status after the service has processed it.',
+        message: 'Suno is making this fix. Refresh results in a bit.',
         audioUrls: [],
         streamUrls: [],
         updatedAt: new Date().toISOString(),
@@ -486,9 +486,9 @@ export default function App() {
           sunoReplacements: [...(current[track.id]?.sunoReplacements ?? []), replacement],
         },
       }));
-      setStatus(`Submitted replacement section for track ${track.id}.`);
+      setStatus(`Sent a section fix for song ${track.id}.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to replace the Suno section.');
+      setError(caught instanceof Error ? caught.message : 'Unable to send that section fix.');
     } finally {
       setApiBusy('');
     }
@@ -519,9 +519,9 @@ export default function App() {
           ),
         },
       }));
-      setStatus(`Updated Suno replacement status for track ${trackId}: ${result.status}.`);
+      setStatus(`Refreshed the Suno fix for song ${trackId}: ${friendlyStatus(result.status)}.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to check Suno replacement status.');
+      setError(caught instanceof Error ? caught.message : 'Unable to refresh that Suno fix.');
     } finally {
       setApiBusy('');
     }
@@ -576,9 +576,11 @@ export default function App() {
         return next;
       });
 
-      setStatus(`Loaded ${callbacks.length} Suno callback record${callbacks.length === 1 ? '' : 's'}; matched ${matched}.`);
+      setStatus(
+        `Brought in ${callbacks.length} finished Suno update${callbacks.length === 1 ? '' : 's'} and found ${matched} song match${matched === 1 ? '' : 'es'}.`,
+      );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to load Suno callback records.');
+      setError(caught instanceof Error ? caught.message : 'Unable to bring in finished Suno songs.');
     } finally {
       setApiBusy('');
     }
@@ -590,9 +592,9 @@ export default function App() {
     try {
       const models = await fetchKitsVoiceModels(apiSettings.kits);
       setVoiceModels(models);
-      setStatus(`Loaded ${models.length} Kits voice models.`);
+      setStatus(`Loaded ${models.length} voice preset${models.length === 1 ? '' : 's'}.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to load Kits voice models.');
+      setError(caught instanceof Error ? caught.message : 'Unable to load voice presets.');
     } finally {
       setApiBusy('');
     }
@@ -610,14 +612,14 @@ export default function App() {
           kits: {
             conversionId: String(result.id),
             status: result.status,
-            message: 'Kits voice conversion submitted.',
+            message: 'Voice pass sent.',
             updatedAt: new Date().toISOString(),
           },
         },
       }));
-      setStatus(`Submitted track ${trackId} audio to Kits AI.`);
+      setStatus(`Sent song ${trackId} audio to the voice tool.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to submit audio to Kits AI.');
+      setError(caught instanceof Error ? caught.message : 'Unable to send audio to the voice tool.');
     } finally {
       setApiBusy('');
     }
@@ -636,14 +638,14 @@ export default function App() {
           kits: {
             conversionId: String(result.id),
             status: result.status,
-            message: 'Kits conversion status updated.',
+            message: 'Voice pass refreshed.',
             updatedAt: new Date().toISOString(),
           },
         },
       }));
-      setStatus(`Updated Kits status for track ${trackId}: ${result.status}.`);
+      setStatus(`Refreshed voice results for song ${trackId}: ${friendlyStatus(result.status)}.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to check Kits status.');
+      setError(caught instanceof Error ? caught.message : 'Unable to refresh voice results.');
     } finally {
       setApiBusy('');
     }
@@ -653,17 +655,25 @@ export default function App() {
     <main className="app-shell">
       <section className="hero">
         <div>
-          <p className="eyebrow">Anniversary Album Maker</p>
-          <h1>Build a 13-song album plan for Robbin.</h1>
+          <p className="eyebrow">Anniversary Music Studio</p>
+          <h1>Shape Robbin's 13-song anniversary album.</h1>
           <p className="hero-copy">
-            Turn memories, places, private jokes, and tone into original lyrics drafts and AI music prompts. Everything
-            runs locally and autosaves in your browser.
+            Move from story notes to protected lyrics, Suno-ready song briefs, and finished audio takes in one focused
+            studio workspace.
           </p>
         </div>
-        <div className="hero-panel" aria-label="Album requirements">
-          <span>13 tracks</span>
-          <span>Original lyrics</span>
-          <span>Local drafts</span>
+        <div className="hero-panel" aria-label="Session snapshot">
+          <div className="studio-meter" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <span>13-song session</span>
+          <span>Lyrics you approve</span>
+          <span>Ready for Suno</span>
         </div>
       </section>
 
@@ -671,35 +681,35 @@ export default function App() {
         <form className="input-panel" onSubmit={(event) => event.preventDefault()}>
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Inputs</p>
-              <h2>Your story details</h2>
+              <p className="eyebrow">Session Notes</p>
+              <h2>Source material</h2>
             </div>
             <button type="button" className="ghost-button" onClick={resetDraft}>
-              Clear
+              Start over
             </button>
           </div>
 
           <div className="field-grid two">
             <TextField
-              label="Anniversary year or date"
+              label="Anniversary date"
               value={inputs.anniversary}
               placeholder="Example: 13th anniversary, June 8, 2026"
               onChange={(value) => updateInput('anniversary', value)}
             />
             <TextField
-              label="Wife's name"
+              label="Her name"
               value={inputs.wifeName}
               placeholder="Robbin"
               onChange={(value) => updateInput('wifeName', value)}
             />
             <TextField
-              label="My name"
+              label="From"
               value={inputs.myName}
               placeholder="Your name"
               onChange={(value) => updateInput('myName', value)}
             />
             <TextField
-              label="Preferred genres"
+              label="Sound"
               value={inputs.genres}
               placeholder="Acoustic pop, soul, folk, soft rock"
               onChange={(value) => updateInput('genres', value)}
@@ -707,44 +717,44 @@ export default function App() {
           </div>
 
           <TextArea
-            label="Relationship memories"
+            label="Story notes"
             value={inputs.memories}
             placeholder={sampleMemories}
             onChange={(value) => updateInput('memories', value)}
           />
           <TextArea
-            label="Important places"
+            label="Places"
             value={inputs.places}
             placeholder={samplePlaces}
             onChange={(value) => updateInput('places', value)}
           />
           <TextArea
-            label="Inside jokes"
+            label="Private lines and jokes"
             value={inputs.insideJokes}
             placeholder={sampleJokes}
             onChange={(value) => updateInput('insideJokes', value)}
           />
           <TextArea
-            label="Desired emotional tone"
+            label="Feeling"
             value={inputs.tone}
             placeholder="Tender, grateful, grown-up, hopeful, quietly romantic"
             onChange={(value) => updateInput('tone', value)}
           />
           <TextArea
-            label="Custom lyric instructions"
+            label="Lyric notes"
             value={inputs.lyricInstructions}
             placeholder="Example: make every chorus end with infinity plus one, keep the verses bluesy and conversational, avoid direct references to hardship"
             onChange={(value) => updateInput('lyricInstructions', value)}
           />
           <div className="field-grid two">
             <TextArea
-              label="Words or phrases to include"
+              label="Must-use words"
               value={inputs.includeWords}
               placeholder="Always, home, your laugh"
               onChange={(value) => updateInput('includeWords', value)}
             />
             <TextArea
-              label="Words or phrases to avoid"
+              label="Words to leave out"
               value={inputs.avoidWords}
               placeholder="Any private words you do not want used"
               onChange={(value) => updateInput('avoidWords', value)}
@@ -753,105 +763,104 @@ export default function App() {
 
           <div className="action-row">
             <button type="button" className="primary-button" onClick={handleGenerate}>
-              Generate album
+              Build songs
             </button>
             <button type="button" className="secondary-button" onClick={handleRegenerateAlbum} disabled={!album}>
-              Regenerate entire album
+              Refresh all songs
             </button>
           </div>
 
-          <section className="sync-panel" aria-label="GitHub storage settings">
+          <section className="sync-panel" aria-label="Save settings">
             <div>
-              <p className="eyebrow">GitHub storage</p>
-              <h2>Sync draft</h2>
+              <p className="eyebrow">Backup</p>
+              <h2>Save your session</h2>
               <p>
-                Use a private repository and a fine-grained token with contents read/write access. The token is stored
-                locally in this browser.
+                Keep a private copy of your session in GitHub. Your access key stays in this browser on this computer.
               </p>
             </div>
             <div className="field-grid two">
               <TextField
-                label="Owner"
+                label="GitHub name"
                 value={githubSettings.owner}
                 placeholder="GitHub username or org"
                 onChange={(value) => updateGitHubSetting('owner', value)}
               />
               <TextField
-                label="Repository"
+                label="GitHub project"
                 value={githubSettings.repo}
                 placeholder="repo-name"
                 onChange={(value) => updateGitHubSetting('repo', value)}
               />
               <TextField
-                label="Branch"
+                label="Save lane"
                 value={githubSettings.branch}
                 placeholder="main"
                 onChange={(value) => updateGitHubSetting('branch', value)}
               />
               <TextField
-                label="File path"
+                label="Save file"
                 value={githubSettings.path}
-                placeholder="anniversary-album-draft.json"
+                placeholder="anniversary-album-session"
                 onChange={(value) => updateGitHubSetting('path', value)}
               />
             </div>
             <label className="field">
-              <span>GitHub token</span>
+              <span>GitHub access key</span>
               <input
                 type="password"
                 value={githubSettings.token}
-                placeholder="Fine-grained token with contents read/write access"
+                placeholder="Private access key for saving this session"
                 onChange={(event) => updateGitHubSetting('token', event.target.value)}
               />
             </label>
             <div className="action-row">
               <button type="button" className="secondary-button" onClick={saveToGitHub} disabled={syncing}>
-                Save to GitHub
+                Save session
               </button>
               <button type="button" className="ghost-button" onClick={loadFromGitHub} disabled={syncing}>
-                Load from GitHub
+                Load session
               </button>
               <button type="button" className="ghost-button" onClick={copyDraftJson}>
-                Copy draft JSON
+                Copy backup text
               </button>
             </div>
             <TextArea
-              label="Import draft JSON"
+              label="Restore from backup text"
               value={importDraftText}
-              placeholder="Paste exported draft JSON here"
+              placeholder="Paste backup text here"
               onChange={setImportDraftText}
             />
             <div className="action-row">
               <button type="button" className="ghost-button" onClick={importDraftJson} disabled={!importDraftText.trim()}>
-                Import draft JSON
+                Restore backup
               </button>
               <button type="button" className="ghost-button" onClick={loadBundledDraft}>
-                Load album.json
+                Load saved album
               </button>
             </div>
           </section>
 
-          <section className="sync-panel" aria-label="Music API settings">
+          <section className="sync-panel" aria-label="Music service settings">
             <div>
-              <p className="eyebrow">Music APIs</p>
-              <h2>Suno and Kits AI</h2>
+              <p className="eyebrow">Music Services</p>
+              <h2>Suno and voice tools</h2>
               <p>
-                API keys are optional and stored locally. Suno creates full songs from each track plan; Kits AI converts
-                uploaded vocal/audio files with a selected voice model.
+                Add service keys when you want this studio to send songs to Suno or create a voice pass from uploaded
+                audio.
               </p>
             </div>
             <label className="field">
-              <span>Suno token</span>
+              <span>Suno access key</span>
               <input
                 type="password"
                 value={apiSettings.suno.token}
-                placeholder="Suno API bearer token"
+                placeholder="Private Suno access key"
                 onChange={(event) => updateSunoSetting('token', event.target.value)}
               />
             </label>
             <div className="field-grid two">
               <label className="field">
-                <span>Suno model</span>
+                <span>Suno version</span>
                 <select
                   value={apiSettings.suno.model}
                   onChange={(event) => updateSunoSetting('model', event.target.value as ApiSettings['suno']['model'])}
@@ -865,25 +874,25 @@ export default function App() {
                 </select>
               </label>
               <label className="field">
-                <span>Vocal gender</span>
+                <span>Voice</span>
                 <select
                   value={apiSettings.suno.vocalGender}
                   onChange={(event) => updateSunoSetting('vocalGender', event.target.value as '' | 'm' | 'f')}
                 >
-                  <option value="">No preference</option>
+                  <option value="">Any voice</option>
                   <option value="m">Male</option>
                   <option value="f">Female</option>
                 </select>
               </label>
             </div>
             <TextField
-              label="Suno callback URL"
+              label="Finished-song return address"
               value={apiSettings.suno.callbackUrl}
-              placeholder="Public URL ending in /api/suno/callback"
+              placeholder="Web address where finished songs come back"
               onChange={(value) => updateSunoSetting('callbackUrl', value)}
             />
             <TextField
-              label="Suno negative tags"
+              label="Sounds to avoid"
               value={apiSettings.suno.negativeTags}
               placeholder="Styles or traits to avoid"
               onChange={(value) => updateSunoSetting('negativeTags', value)}
@@ -894,21 +903,21 @@ export default function App() {
                 checked={apiSettings.suno.instrumental}
                 onChange={(event) => updateSunoSetting('instrumental', event.target.checked)}
               />
-              <span>Generate instrumental Suno tracks</span>
+              <span>Make instrumental tracks</span>
             </label>
 
             <label className="field">
-              <span>Kits AI token</span>
+              <span>Voice tool access key</span>
               <input
                 type="password"
                 value={apiSettings.kits.token}
-                placeholder="Kits AI bearer token"
+                placeholder="Private voice tool access key"
                 onChange={(event) => updateKitsSetting('token', event.target.value)}
               />
             </label>
             <div className="field-grid two">
               <TextField
-                label="Kits voice model ID"
+                label="Voice preset number"
                 value={apiSettings.kits.voiceModelId}
                 placeholder="Example: 1014961"
                 onChange={(value) => updateKitsSetting('voiceModelId', value)}
@@ -920,13 +929,13 @@ export default function App() {
                 onChange={(value) => updateKitsSetting('pitchShift', value)}
               />
               <TextField
-                label="Conversion strength"
+                label="Voice match"
                 value={apiSettings.kits.conversionStrength}
                 placeholder="0 to 1"
                 onChange={(value) => updateKitsSetting('conversionStrength', value)}
               />
               <TextField
-                label="Model volume mix"
+                label="Voice blend"
                 value={apiSettings.kits.modelVolumeMix}
                 placeholder="0 to 1"
                 onChange={(value) => updateKitsSetting('modelVolumeMix', value)}
@@ -938,14 +947,14 @@ export default function App() {
                 className="secondary-button"
                 onClick={() => updateSunoSetting('callbackUrl', productionCallbackUrl())}
               >
-                Use production callback
+                Use live return address
               </button>
               <button
                 type="button"
                 className="ghost-button"
                 onClick={() => updateSunoSetting('callbackUrl', 'http://localhost:8787/api/suno/callback')}
               >
-                Use local callback
+                Use this computer
               </button>
               <button
                 type="button"
@@ -953,10 +962,10 @@ export default function App() {
                 onClick={loadSunoCallbacks}
                 disabled={apiBusy === 'suno-callbacks'}
               >
-                Load Suno callbacks
+                Bring in finished songs
               </button>
               <button type="button" className="ghost-button" onClick={loadKitsModels} disabled={apiBusy === 'kits-models'}>
-                Load Kits models
+                Find voice presets
               </button>
             </div>
             {voiceModels.length ? (
@@ -981,11 +990,11 @@ export default function App() {
             <>
               <div className="album-toolbar">
                 <div>
-                  <p className="eyebrow">Album plan</p>
+                  <p className="eyebrow">Session Board</p>
                   <h2>{album.title}</h2>
                 </div>
                 <button type="button" className="ghost-button" onClick={handleRegenerateTitle}>
-                  Regenerate title
+                  Refresh album name
                 </button>
               </div>
               <p className="concept">{album.concept}</p>
@@ -994,13 +1003,13 @@ export default function App() {
                   Copy
                 </button>
                 <button type="button" onClick={exportMarkdown}>
-                  Markdown
+                  Lyric sheet
                 </button>
                 <button type="button" onClick={exportHtml}>
-                  PDF-ready HTML
+                  Print page
                 </button>
                 <button type="button" onClick={exportJson}>
-                  JSON
+                  Backup file
                 </button>
               </div>
               <div className="track-list">
@@ -1029,9 +1038,9 @@ export default function App() {
             </>
           ) : (
             <div className="empty-state">
-              <p className="eyebrow">Ready when you are</p>
-              <h2>No album generated yet.</h2>
-              <p>Add as many details as you have. Blank fields still produce a complete local draft.</p>
+              <p className="eyebrow">Studio Waiting</p>
+              <h2>No songs on the board yet.</h2>
+              <p>Add whatever story notes you have. Empty spaces still produce a complete first pass.</p>
             </div>
           )}
         </section>
@@ -1091,6 +1100,16 @@ function sunoImageUrls(tracks: SunoGeneratedTrack[]): string[] {
 
 function displayAudioUrls(result?: { audioUrls: string[]; tracks?: SunoGeneratedTrack[] }): string[] {
   return result?.tracks?.length ? sunoAudioUrls(result.tracks) : uniqueHttpUrls(result?.audioUrls ?? []);
+}
+
+function friendlyStatus(status: string): string {
+  const normalized = status.trim().toUpperCase();
+  if (!normalized) return 'Waiting';
+  if (['SUBMITTED', 'PENDING', 'QUEUED', 'CREATE_TASK', 'TEXT_SUCCESS'].includes(normalized)) return 'In progress';
+  if (['SUCCESS', 'COMPLETE', 'COMPLETED', 'CALLBACK_COMPLETE'].includes(normalized)) return 'Ready';
+  if (['FAILED', 'ERROR'].includes(normalized)) return 'Needs attention';
+  if (normalized === 'UNKNOWN') return 'Waiting';
+  return status.replace(/_/g, ' ').toLowerCase();
 }
 
 function uniqueHttpUrls(values: Array<string | null | undefined>): string[] {
@@ -1180,13 +1199,13 @@ function TrackCard({
         </div>
         <div className="track-actions">
           <button type="button" onClick={() => onAction(track.id, 'song')}>
-            Song
+            Refresh song
           </button>
           <button type="button" onClick={() => onAction(track.id, 'lyrics')}>
-            Lyrics
+            Rewrite lyrics
           </button>
           <button type="button" onClick={() => onAction(track.id, 'prompt')}>
-            Prompt
+            Refresh brief
           </button>
         </div>
       </header>
@@ -1194,13 +1213,13 @@ function TrackCard({
         <div className="track-body">
           <div className="metadata-grid">
             <TextArea
-              label="Emotional purpose"
+              label="Feeling"
               value={track.emotionalPurpose}
               placeholder="What this track should express"
               onChange={(value) => onEdit(track.id, 'emotionalPurpose', value)}
             />
             <TextArea
-              label="Description"
+              label="Story"
               value={track.shortDescription}
               placeholder="Track description"
               onChange={(value) => onEdit(track.id, 'shortDescription', value)}
@@ -1212,13 +1231,13 @@ function TrackCard({
               onChange={(value) => onEdit(track.id, 'dedicationNote', value)}
             />
             <TextArea
-              label="Vocal style"
+              label="Voice direction"
               value={track.vocalStyle}
               placeholder="Vocal style"
               onChange={(value) => onEdit(track.id, 'vocalStyle', value)}
             />
             <TextArea
-              label="Instrumentation"
+              label="Arrangement"
               value={track.instrumentation}
               placeholder="Instrumentation"
               onChange={(value) => onEdit(track.id, 'instrumentation', value)}
@@ -1227,30 +1246,30 @@ function TrackCard({
           <section>
             <div className="section-heading">
               <div>
-                <h3>Original lyrics draft</h3>
-                <span className="lock-status">{track.lyricsLocked ? 'Locked' : 'Unlocked for editing'}</span>
+                <h3>Approved lyric draft</h3>
+                <span className="lock-status">{track.lyricsLocked ? 'Protected' : 'Open for edits'}</span>
               </div>
               <button
                 type="button"
                 className="ghost-button compact-button"
                 onClick={() => onLyricsLockChange(track.id, !track.lyricsLocked)}
               >
-                {track.lyricsLocked ? 'Unlock lyrics' : 'Lock lyrics'}
+                {track.lyricsLocked ? 'Edit lyrics' : 'Protect lyrics'}
               </button>
             </div>
             <textarea
               className="track-textarea lyrics-editor"
-              aria-label={`Original lyrics draft for ${track.title}`}
+              aria-label={`Approved lyric draft for ${track.title}`}
               value={track.lyrics}
               readOnly={track.lyricsLocked}
               onChange={(event) => onEdit(track.id, 'lyrics', event.target.value)}
             />
           </section>
           <section>
-            <h3>AI music tool prompt</h3>
+            <h3>Music brief for Suno</h3>
             <textarea
               className="track-textarea prompt-editor"
-              aria-label={`AI music tool prompt for ${track.title}`}
+              aria-label={`Music brief for Suno for ${track.title}`}
               value={track.musicPrompt}
               onChange={(event) => onEdit(track.id, 'musicPrompt', event.target.value)}
             />
@@ -1332,38 +1351,38 @@ function ApiTrackPanel({
       <div className="api-service">
         <div>
           <strong>Suno</strong>
-          <span>{result?.suno?.status ?? 'Not submitted'}</span>
+          <span>{result?.suno?.status ? friendlyStatus(result.suno.status) : 'Not sent'}</span>
         </div>
         <div className="track-actions">
           <button type="button" onClick={() => onSunoGenerate(track)} disabled={busy === `suno-${track.id}`}>
-            Generate
+            Send to Suno
           </button>
           <button
             type="button"
             onClick={() => onSunoCheck(track.id)}
             disabled={!result?.suno?.taskId || busy === `suno-check-${track.id}`}
           >
-            Check
+            Refresh results
           </button>
           <button
             type="button"
             onClick={() => setReplaceOpen((current) => !current)}
             disabled={!result?.suno?.taskId}
           >
-            Replace section
+            Fix section
           </button>
         </div>
       </div>
       {result?.suno ? (
         <div className="api-result">
-          <span>Task: {result.suno.taskId}</span>
+          <span>Suno reference: {result.suno.taskId}</span>
           {sunoAudioLinks.map((url, index) => (
             <a key={url} href={url} target="_blank" rel="noreferrer">
               Audio {index + 1}
             </a>
           ))}
           {!sunoAudioLinks.length && result.suno.status !== 'SUBMITTED' ? (
-            <span>Audio file URL is not available yet; check status again or load callbacks.</span>
+            <span>Finished audio is not ready yet. Refresh results or bring in finished songs.</span>
           ) : null}
         </div>
       ) : null}
@@ -1371,7 +1390,7 @@ function ApiTrackPanel({
         <div className="replace-panel">
           <div className="field-grid three">
             <label className="field">
-              <span>Audio take</span>
+              <span>Finished take</span>
               <select
                 value={replaceForm.sourceAudioId}
                 disabled={!sunoTracks.length}
@@ -1384,12 +1403,12 @@ function ApiTrackPanel({
                     </option>
                   ))
                 ) : (
-                  <option value="">Check status to load audio IDs</option>
+                  <option value="">Refresh results to load takes</option>
                 )}
               </select>
             </label>
             <label className="field">
-              <span>Start seconds</span>
+              <span>Fix starts at</span>
               <input
                 type="number"
                 min="0"
@@ -1399,7 +1418,7 @@ function ApiTrackPanel({
               />
             </label>
             <label className="field">
-              <span>End seconds</span>
+              <span>Fix ends at</span>
               <input
                 type="number"
                 min="0"
@@ -1410,7 +1429,7 @@ function ApiTrackPanel({
             </label>
           </div>
           <label className="field">
-            <span>Replacement prompt</span>
+            <span>Corrected lyric or direction</span>
             <textarea
               rows={4}
               value={replaceForm.prompt}
@@ -1420,13 +1439,13 @@ function ApiTrackPanel({
           </label>
           <div className="field-grid two">
             <TextField
-              label="Replacement tags"
+              label="Sound notes"
               value={replaceForm.tags}
               placeholder="Blues, warm vocal, same arrangement"
               onChange={(value) => updateReplaceForm('tags', value)}
             />
             <TextField
-              label="Replacement title"
+              label="Fix name"
               value={replaceForm.title}
               placeholder={`${track.title} section fix`}
               onChange={(value) => updateReplaceForm('title', value)}
@@ -1443,7 +1462,7 @@ function ApiTrackPanel({
                 busy === `suno-replace-${track.id}`
               }
             >
-              Submit replacement
+              Send fix
             </button>
           </div>
         </div>
@@ -1452,7 +1471,7 @@ function ApiTrackPanel({
         <div className="replacement-list">
           {result.sunoReplacements.map((replacement, index) => (
             <div className="api-result" key={replacement.taskId}>
-              <span>Replacement {index + 1}: {replacement.status}</span>
+              <span>Fix {index + 1}: {friendlyStatus(replacement.status)}</span>
               <span>
                 {formatSeconds(replacement.infillStartS)}-{formatSeconds(replacement.infillEndS)}
               </span>
@@ -1461,15 +1480,15 @@ function ApiTrackPanel({
                 onClick={() => onSunoReplacementCheck(track.id, replacement.taskId)}
                 disabled={busy === `suno-replace-check-${track.id}-${replacement.taskId}`}
               >
-                Check replacement
+                Refresh fix
               </button>
               {displayAudioUrls(replacement).map((url, audioIndex) => (
                 <a key={url} href={url} target="_blank" rel="noreferrer">
-                  Replacement audio {audioIndex + 1}
+                  Fixed audio {audioIndex + 1}
                 </a>
               ))}
               {!displayAudioUrls(replacement).length && replacement.status !== 'SUBMITTED' ? (
-                <span>Replacement audio file URL is not available yet; check status again or load callbacks.</span>
+                <span>Fixed audio is not ready yet. Refresh the fix or bring in finished songs.</span>
               ) : null}
             </div>
           ))}
@@ -1478,12 +1497,12 @@ function ApiTrackPanel({
 
       <div className="api-service">
         <div>
-          <strong>Kits AI</strong>
-          <span>{result?.kits?.status ?? 'No conversion'}</span>
+          <strong>Voice tool</strong>
+          <span>{result?.kits?.status ? friendlyStatus(result.kits.status) : 'No voice pass'}</span>
         </div>
         <div className="track-actions">
           <label className="file-button">
-            Convert audio
+            Change voice
             <input type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={handleFile} />
           </label>
           <button
@@ -1491,13 +1510,13 @@ function ApiTrackPanel({
             onClick={() => onKitsCheck(track.id)}
             disabled={!result?.kits?.conversionId || busy === `kits-check-${track.id}`}
           >
-            Check
+            Refresh
           </button>
         </div>
       </div>
       {result?.kits ? (
         <div className="api-result">
-          <span>Conversion: {result.kits.conversionId}</span>
+          <span>Voice reference: {result.kits.conversionId}</span>
           <span>{result.kits.message}</span>
         </div>
       ) : null}

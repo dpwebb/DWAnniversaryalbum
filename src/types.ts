@@ -70,6 +70,19 @@ export type ApiSettings = {
   kits: KitsSettings;
 };
 
+export type SunoGeneratedTrack = {
+  id: string;
+  title: string;
+  audioUrl: string;
+  streamAudioUrl: string;
+  imageUrl: string;
+  prompt: string;
+  modelName: string;
+  tags: string;
+  createTime: string;
+  duration: number | null;
+};
+
 export type SunoTrackResult = {
   taskId: string;
   status: string;
@@ -77,6 +90,25 @@ export type SunoTrackResult = {
   audioUrls: string[];
   streamUrls: string[];
   imageUrls?: string[];
+  tracks?: SunoGeneratedTrack[];
+  updatedAt: string;
+};
+
+export type SunoReplacementResult = {
+  taskId: string;
+  sourceTaskId: string;
+  sourceAudioId: string;
+  infillStartS: number;
+  infillEndS: number;
+  prompt: string;
+  tags: string;
+  title: string;
+  status: string;
+  message: string;
+  audioUrls: string[];
+  streamUrls: string[];
+  imageUrls?: string[];
+  tracks?: SunoGeneratedTrack[];
   updatedAt: string;
 };
 
@@ -89,6 +121,7 @@ export type KitsTrackResult = {
 
 export type ApiTrackResult = {
   suno?: SunoTrackResult;
+  sunoReplacements?: SunoReplacementResult[];
   kits?: KitsTrackResult;
 };
 

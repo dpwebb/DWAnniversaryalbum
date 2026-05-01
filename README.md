@@ -54,6 +54,7 @@ The app still works locally without these APIs. Add tokens only when you want to
 - Choose the Suno model and vocal settings.
 - Each track has `Generate` and `Check` actions.
 - The app submits each track with custom mode enabled, using the original lyrics draft and any custom lyric instructions unless instrumental mode is selected.
+- After checking a completed Suno track, use `Replace section` to submit a 6-60 second replacement segment for pronunciation or lyric fixes. The replacement form needs the generated audio take, start/end seconds, corrected lyric prompt, tags, and title.
 
 #### Suno Callback Receiver
 

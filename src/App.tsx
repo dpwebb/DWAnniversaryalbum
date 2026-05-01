@@ -15,6 +15,7 @@ import {
   fetchKitsVoiceModels,
   getKitsVoiceConversion,
   getSunoSong,
+  replaceSunoSection,
 } from './lib/apiIntegrations';
 import { loadDraftFromGitHub, saveDraftToGitHub, validateGitHubSettings } from './lib/githubStorage';
 import {
@@ -36,6 +37,9 @@ import type {
   GitHubStorageSettings,
   KitsVoiceModel,
   SongPlan,
+  SunoCallbackTrack,
+  SunoGeneratedTrack,
+  SunoReplacementResult,
 } from './types';
 
 const sampleMemories = 'our first trip together, quiet Sunday mornings, the day we knew this was real';
@@ -43,6 +47,16 @@ const samplePlaces = 'home, the beach, our favorite restaurant';
 const sampleJokes = 'the parking lot debate, our secret phrase, the wrong-turn adventure';
 const bundledDraft = albumDraft as DraftState;
 type DraftPayload = Partial<DraftState> & { inputs: Partial<AlbumInputs> };
+type SunoSectionReplacementInput = {
+  sourceTaskId: string;
+  sourceAudioId: string;
+  sourceDuration?: number | null;
+  infillStartS: number;
+  infillEndS: number;
+  prompt: string;
+  tags: string;
+  title: string;
+};
 
 function productionCallbackUrl() {
   return `${window.location.origin}/api/suno/callback`;
@@ -386,6 +400,75 @@ export default function App() {
     }
   }
 
+  async function replaceSunoTrackSection(track: SongPlan, request: SunoSectionReplacementInput) {
+    setApiBusy(`suno-replace-${track.id}`);
+    setError('');
+    try {
+      const taskId = await replaceSunoSection(apiSettings.suno, request);
+      const replacement: SunoReplacementResult = {
+        taskId,
+        sourceTaskId: request.sourceTaskId,
+        sourceAudioId: request.sourceAudioId,
+        infillStartS: request.infillStartS,
+        infillEndS: request.infillEndS,
+        prompt: request.prompt,
+        tags: request.tags,
+        title: request.title,
+        status: 'SUBMITTED',
+        message: 'Suno replacement task created. Check status after the service has processed it.',
+        audioUrls: [],
+        streamUrls: [],
+        updatedAt: new Date().toISOString(),
+      };
+
+      setApiResults((current) => ({
+        ...current,
+        [track.id]: {
+          ...current[track.id],
+          sunoReplacements: [...(current[track.id]?.sunoReplacements ?? []), replacement],
+        },
+      }));
+      setStatus(`Submitted replacement section for track ${track.id}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to replace the Suno section.');
+    } finally {
+      setApiBusy('');
+    }
+  }
+
+  async function checkSunoReplacementStatus(trackId: number, taskId: string) {
+    setApiBusy(`suno-replace-check-${trackId}-${taskId}`);
+    setError('');
+    try {
+      const result = await getSunoSong(apiSettings.suno, taskId);
+      setApiResults((current) => ({
+        ...current,
+        [trackId]: {
+          ...current[trackId],
+          sunoReplacements: (current[trackId]?.sunoReplacements ?? []).map((replacement) =>
+            replacement.taskId === taskId
+              ? {
+                  ...replacement,
+                  status: result.status,
+                  message: result.message,
+                  audioUrls: result.audioUrls,
+                  streamUrls: result.streamUrls,
+                  imageUrls: result.imageUrls,
+                  tracks: result.tracks,
+                  updatedAt: new Date().toISOString(),
+                }
+              : replacement,
+          ),
+        },
+      }));
+      setStatus(`Updated Suno replacement status for track ${trackId}: ${result.status}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to check Suno replacement status.');
+    } finally {
+      setApiBusy('');
+    }
+  }
+
   async function loadSunoCallbacks() {
     setApiBusy('suno-callbacks');
     setError('');
@@ -397,22 +480,39 @@ export default function App() {
       setApiResults((current) => {
         const next = { ...current };
         Object.entries(current).forEach(([trackId, result]) => {
-          const taskId = result.suno?.taskId;
-          if (!taskId) return;
-          const callback = callbacksByTaskId.get(taskId);
-          if (!callback) return;
-          matched += 1;
+          const sunoTaskId = result.suno?.taskId;
+          const sunoCallback = sunoTaskId ? callbacksByTaskId.get(sunoTaskId) : undefined;
+          const replacementCallbacks = (result.sunoReplacements ?? []).map((replacement) => ({
+            replacement,
+            callback: callbacksByTaskId.get(replacement.taskId),
+          }));
+          if (!sunoCallback && replacementCallbacks.every((item) => !item.callback)) return;
+
+          const callbackStatus = sunoCallback ? sunoCallbackToResult(sunoCallback) : null;
+          if (callbackStatus) {
+            matched += 1;
+          }
+
+          const sunoReplacements = replacementCallbacks.map(({ replacement, callback }) => {
+            const replacementStatus = callback ? sunoCallbackToResult(callback) : null;
+            if (!replacementStatus) return replacement;
+            matched += 1;
+            return {
+              ...replacement,
+              ...replacementStatus,
+            };
+          });
+
           next[Number(trackId)] = {
             ...result,
-            suno: {
-              taskId,
-              status: callback.callbackType === 'complete' && callback.code === 200 ? 'CALLBACK_COMPLETE' : callback.callbackType,
-              message: callback.msg,
-              audioUrls: callback.tracks.map((track) => track.audioUrl).filter(Boolean),
-              streamUrls: callback.tracks.map((track) => track.streamAudioUrl).filter(Boolean),
-              imageUrls: callback.tracks.map((track) => track.imageUrl).filter(Boolean),
-              updatedAt: callback.receivedAt,
-            },
+            suno:
+              result.suno && callbackStatus
+                ? {
+                    ...result.suno,
+                    ...callbackStatus,
+                  }
+                : result.suno,
+            sunoReplacements: sunoReplacements.length ? sunoReplacements : result.sunoReplacements,
           };
         });
         return next;
@@ -855,6 +955,8 @@ export default function App() {
                       busy={apiBusy}
                       onSunoGenerate={sendTrackToSuno}
                       onSunoCheck={checkSunoStatus}
+                      onSunoReplace={replaceSunoTrackSection}
+                      onSunoReplacementCheck={checkSunoReplacementStatus}
                       onKitsConvert={sendTrackToKits}
                       onKitsCheck={checkKitsStatus}
                     />
@@ -873,6 +975,50 @@ export default function App() {
       </section>
     </main>
   );
+}
+
+function sunoCallbackToResult(callback: {
+  code: number;
+  msg: string;
+  callbackType: string;
+  receivedAt: string;
+  tracks: SunoCallbackTrack[];
+}) {
+  const tracks = callback.tracks.map(callbackTrackToGeneratedTrack);
+  return {
+    status: callback.callbackType === 'complete' && callback.code === 200 ? 'CALLBACK_COMPLETE' : callback.callbackType,
+    message: callback.msg,
+    audioUrls: tracks.map((track) => track.audioUrl).filter(Boolean),
+    streamUrls: tracks.map((track) => track.streamAudioUrl).filter(Boolean),
+    imageUrls: tracks.map((track) => track.imageUrl).filter(Boolean),
+    tracks,
+    updatedAt: callback.receivedAt,
+  };
+}
+
+function callbackTrackToGeneratedTrack(track: SunoCallbackTrack): SunoGeneratedTrack {
+  return {
+    id: track.id,
+    title: track.title,
+    audioUrl: track.audioUrl,
+    streamAudioUrl: track.streamAudioUrl,
+    imageUrl: track.imageUrl,
+    prompt: track.prompt,
+    modelName: track.modelName,
+    tags: track.tags,
+    createTime: track.createTime,
+    duration: track.duration,
+  };
+}
+
+function audioTakeLabel(track: SunoGeneratedTrack, index: number): string {
+  const duration = track.duration ? `, ${formatSeconds(track.duration)}` : '';
+  const title = track.title ? `, ${track.title}` : '';
+  return `Take ${index + 1}${duration}${title}`;
+}
+
+function formatSeconds(value: number): string {
+  return `${Number.isInteger(value) ? value : value.toFixed(2)}s`;
 }
 
 type FieldProps = {
@@ -987,6 +1133,8 @@ function ApiTrackPanel({
   busy,
   onSunoGenerate,
   onSunoCheck,
+  onSunoReplace,
+  onSunoReplacementCheck,
   onKitsConvert,
   onKitsCheck,
 }: {
@@ -995,15 +1143,53 @@ function ApiTrackPanel({
   busy: string;
   onSunoGenerate: (track: SongPlan) => void;
   onSunoCheck: (trackId: number) => void;
+  onSunoReplace: (track: SongPlan, request: SunoSectionReplacementInput) => void;
+  onSunoReplacementCheck: (trackId: number, taskId: string) => void;
   onKitsConvert: (trackId: number, file: File) => void;
   onKitsCheck: (trackId: number) => void;
 }) {
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceForm, setReplaceForm] = useState({
+    sourceAudioId: '',
+    infillStartS: '0',
+    infillEndS: '6',
+    prompt: '',
+    tags: track.genreStyle,
+    title: `${track.title} section fix`,
+  });
+  const sunoTracks = result?.suno?.tracks?.filter((item) => item.id) ?? [];
+  const selectedSunoTrack = sunoTracks.find((item) => item.id === replaceForm.sourceAudioId) ?? sunoTracks[0];
+  const firstAudioId = sunoTracks[0]?.id ?? '';
+
+  useEffect(() => {
+    if (!replaceForm.sourceAudioId && firstAudioId) {
+      setReplaceForm((current) => ({ ...current, sourceAudioId: firstAudioId }));
+    }
+  }, [firstAudioId, replaceForm.sourceAudioId]);
+
   function handleFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (file) {
       onKitsConvert(track.id, file);
       event.target.value = '';
     }
+  }
+
+  function updateReplaceForm(key: keyof typeof replaceForm, value: string) {
+    setReplaceForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function submitReplacement() {
+    onSunoReplace(track, {
+      sourceTaskId: result?.suno?.taskId ?? '',
+      sourceAudioId: replaceForm.sourceAudioId,
+      sourceDuration: selectedSunoTrack?.duration,
+      infillStartS: Number.parseFloat(replaceForm.infillStartS),
+      infillEndS: Number.parseFloat(replaceForm.infillEndS),
+      prompt: replaceForm.prompt,
+      tags: replaceForm.tags,
+      title: replaceForm.title,
+    });
   }
 
   return (
@@ -1024,6 +1210,13 @@ function ApiTrackPanel({
           >
             Check
           </button>
+          <button
+            type="button"
+            onClick={() => setReplaceOpen((current) => !current)}
+            disabled={!result?.suno?.taskId}
+          >
+            Replace section
+          </button>
         </div>
       </div>
       {result?.suno ? (
@@ -1038,6 +1231,116 @@ function ApiTrackPanel({
             <a key={url} href={url} target="_blank" rel="noreferrer">
               Stream {index + 1}
             </a>
+          ))}
+        </div>
+      ) : null}
+      {replaceOpen ? (
+        <div className="replace-panel">
+          <div className="field-grid three">
+            <label className="field">
+              <span>Audio take</span>
+              <select
+                value={replaceForm.sourceAudioId}
+                disabled={!sunoTracks.length}
+                onChange={(event) => updateReplaceForm('sourceAudioId', event.target.value)}
+              >
+                {sunoTracks.length ? (
+                  sunoTracks.map((item, index) => (
+                    <option key={item.id} value={item.id}>
+                      {audioTakeLabel(item, index)}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Check status to load audio IDs</option>
+                )}
+              </select>
+            </label>
+            <label className="field">
+              <span>Start seconds</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={replaceForm.infillStartS}
+                onChange={(event) => updateReplaceForm('infillStartS', event.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>End seconds</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={replaceForm.infillEndS}
+                onChange={(event) => updateReplaceForm('infillEndS', event.target.value)}
+              />
+            </label>
+          </div>
+          <label className="field">
+            <span>Replacement prompt</span>
+            <textarea
+              rows={4}
+              value={replaceForm.prompt}
+              placeholder="Correct the lyric here, including phonetic spelling if needed."
+              onChange={(event) => updateReplaceForm('prompt', event.target.value)}
+            />
+          </label>
+          <div className="field-grid two">
+            <TextField
+              label="Replacement tags"
+              value={replaceForm.tags}
+              placeholder="Blues, warm vocal, same arrangement"
+              onChange={(value) => updateReplaceForm('tags', value)}
+            />
+            <TextField
+              label="Replacement title"
+              value={replaceForm.title}
+              placeholder={`${track.title} section fix`}
+              onChange={(value) => updateReplaceForm('title', value)}
+            />
+          </div>
+          <div className="track-actions">
+            <button
+              type="button"
+              onClick={submitReplacement}
+              disabled={
+                !result?.suno?.taskId ||
+                !replaceForm.sourceAudioId ||
+                !replaceForm.prompt.trim() ||
+                busy === `suno-replace-${track.id}`
+              }
+            >
+              Submit replacement
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {result?.sunoReplacements?.length ? (
+        <div className="replacement-list">
+          {result.sunoReplacements.map((replacement, index) => (
+            <div className="api-result" key={replacement.taskId}>
+              <span>Replacement {index + 1}: {replacement.status}</span>
+              <span>
+                {formatSeconds(replacement.infillStartS)}-{formatSeconds(replacement.infillEndS)}
+              </span>
+              <button
+                type="button"
+                onClick={() => onSunoReplacementCheck(track.id, replacement.taskId)}
+                disabled={busy === `suno-replace-check-${track.id}-${replacement.taskId}`}
+              >
+                Check replacement
+              </button>
+              {replacement.audioUrls.map((url, audioIndex) => (
+                <a key={url} href={url} target="_blank" rel="noreferrer">
+                  Replacement audio {audioIndex + 1}
+                </a>
+              ))}
+              {replacement.streamUrls.map((url, streamIndex) => (
+                <a key={url} href={url} target="_blank" rel="noreferrer">
+                  Replacement stream {streamIndex + 1}
+                </a>
+              ))}
+            </div>
           ))}
         </div>
       ) : null}

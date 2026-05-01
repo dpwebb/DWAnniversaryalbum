@@ -168,6 +168,10 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.field-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .field {
   display: grid;
   gap: 7px;
@@ -461,9 +465,31 @@ pre,
   gap: 10px;
 }
 
-.api-result a {
+.api-result a,
+.api-result button {
   color: #1f696d;
   font-weight: 800;
+}
+
+.api-result button {
+  background: #fffdfa;
+  border: 1px solid #dfcbc4;
+  min-height: 34px;
+  padding: 0.4rem 0.65rem;
+}
+
+.replace-panel {
+  background: #fffdfa;
+  border: 1px solid #eadbd5;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.replacement-list {
+  display: grid;
+  gap: 8px;
 }
 
 .file-button {
@@ -527,6 +553,7 @@ pre,
 
   .hero-panel,
   .field-grid.two,
+  .field-grid.three,
   dl {
     grid-template-columns: 1fr;
   }

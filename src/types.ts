@@ -75,8 +75,11 @@ export type SunoGeneratedTrack = {
   id: string;
   title: string;
   audioUrl: string;
+  sourceAudioUrl: string;
   streamAudioUrl: string;
+  sourceStreamAudioUrl: string;
   imageUrl: string;
+  sourceImageUrl: string;
   prompt: string;
   modelName: string;
   tags: string;

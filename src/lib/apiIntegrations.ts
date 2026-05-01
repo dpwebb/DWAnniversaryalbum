@@ -22,8 +22,14 @@ type SunoRecordResponse = {
         id?: string;
         title?: string;
         audioUrl?: string;
+        sourceAudioUrl?: string;
+        source_audio_url?: string;
         streamAudioUrl?: string;
+        sourceStreamAudioUrl?: string;
+        source_stream_audio_url?: string;
         imageUrl?: string;
+        sourceImageUrl?: string;
+        source_image_url?: string;
         prompt?: string;
         modelName?: string;
         tags?: string;
@@ -190,9 +196,9 @@ export async function getSunoSong(settings: SunoSettings, taskId: string) {
     taskId: payload.data.taskId ?? taskId,
     status: payload.data.status ?? 'UNKNOWN',
     message: payload.data.errorMessage ?? payload.msg ?? '',
-    audioUrls: tracks.map((item) => item.audioUrl).filter(Boolean),
-    streamUrls: tracks.map((item) => item.streamAudioUrl).filter(Boolean),
-    imageUrls: tracks.map((item) => item.imageUrl).filter(Boolean),
+    audioUrls: audioUrlsFromTracks(tracks),
+    streamUrls: streamUrlsFromTracks(tracks),
+    imageUrls: imageUrlsFromTracks(tracks),
     tracks,
   };
 }
@@ -328,19 +334,55 @@ function compactSunoText(value: string): string {
   return value.replace(/\s+/g, ' ').replace(/\s+\./g, '.').trim();
 }
 
-function normalizeSunoTracks(items: Array<Partial<SunoGeneratedTrack> & { streamAudioUrl?: string }>): SunoGeneratedTrack[] {
+function normalizeSunoTracks(
+  items: Array<
+    Partial<SunoGeneratedTrack> & {
+      source_audio_url?: string;
+      source_stream_audio_url?: string;
+      source_image_url?: string;
+    }
+  >,
+): SunoGeneratedTrack[] {
   return items.map((item) => ({
     id: item.id ?? '',
     title: item.title ?? '',
     audioUrl: item.audioUrl ?? '',
+    sourceAudioUrl: item.sourceAudioUrl ?? item.source_audio_url ?? '',
     streamAudioUrl: item.streamAudioUrl ?? '',
+    sourceStreamAudioUrl: item.sourceStreamAudioUrl ?? item.source_stream_audio_url ?? '',
     imageUrl: item.imageUrl ?? '',
+    sourceImageUrl: item.sourceImageUrl ?? item.source_image_url ?? '',
     prompt: item.prompt ?? '',
     modelName: item.modelName ?? '',
     tags: item.tags ?? '',
     createTime: item.createTime ?? '',
     duration: typeof item.duration === 'number' ? item.duration : null,
   }));
+}
+
+function audioUrlsFromTracks(tracks: SunoGeneratedTrack[]): string[] {
+  return uniqueHttpUrls(tracks.flatMap((track) => [track.audioUrl, track.sourceAudioUrl]));
+}
+
+function streamUrlsFromTracks(tracks: SunoGeneratedTrack[]): string[] {
+  return uniqueHttpUrls(tracks.flatMap((track) => [track.streamAudioUrl, track.sourceStreamAudioUrl]));
+}
+
+function imageUrlsFromTracks(tracks: SunoGeneratedTrack[]): string[] {
+  return uniqueHttpUrls(tracks.flatMap((track) => [track.imageUrl, track.sourceImageUrl]));
+}
+
+function uniqueHttpUrls(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.map((value) => value?.trim() ?? '').filter(isHttpUrl)));
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function roundSeconds(value: number): number {

@@ -1051,9 +1051,9 @@ function sunoCallbackToResult(callback: {
   return {
     status: callback.callbackType === 'complete' && callback.code === 200 ? 'CALLBACK_COMPLETE' : callback.callbackType,
     message: callback.msg,
-    audioUrls: tracks.map((track) => track.audioUrl).filter(Boolean),
-    streamUrls: tracks.map((track) => track.streamAudioUrl).filter(Boolean),
-    imageUrls: tracks.map((track) => track.imageUrl).filter(Boolean),
+    audioUrls: sunoAudioUrls(tracks),
+    streamUrls: sunoStreamUrls(tracks),
+    imageUrls: sunoImageUrls(tracks),
     tracks,
     updatedAt: callback.receivedAt,
   };
@@ -1064,14 +1064,46 @@ function callbackTrackToGeneratedTrack(track: SunoCallbackTrack): SunoGeneratedT
     id: track.id,
     title: track.title,
     audioUrl: track.audioUrl,
+    sourceAudioUrl: track.sourceAudioUrl,
     streamAudioUrl: track.streamAudioUrl,
+    sourceStreamAudioUrl: track.sourceStreamAudioUrl,
     imageUrl: track.imageUrl,
+    sourceImageUrl: track.sourceImageUrl,
     prompt: track.prompt,
     modelName: track.modelName,
     tags: track.tags,
     createTime: track.createTime,
     duration: track.duration,
   };
+}
+
+function sunoAudioUrls(tracks: SunoGeneratedTrack[]): string[] {
+  return uniqueHttpUrls(tracks.flatMap((track) => [track.audioUrl, track.sourceAudioUrl]));
+}
+
+function sunoStreamUrls(tracks: SunoGeneratedTrack[]): string[] {
+  return uniqueHttpUrls(tracks.flatMap((track) => [track.streamAudioUrl, track.sourceStreamAudioUrl]));
+}
+
+function sunoImageUrls(tracks: SunoGeneratedTrack[]): string[] {
+  return uniqueHttpUrls(tracks.flatMap((track) => [track.imageUrl, track.sourceImageUrl]));
+}
+
+function displayAudioUrls(result?: { audioUrls: string[]; tracks?: SunoGeneratedTrack[] }): string[] {
+  return result?.tracks?.length ? sunoAudioUrls(result.tracks) : uniqueHttpUrls(result?.audioUrls ?? []);
+}
+
+function uniqueHttpUrls(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.map((value) => value?.trim() ?? '').filter(isHttpUrl)));
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function audioTakeLabel(track: SunoGeneratedTrack, index: number): string {
@@ -1262,6 +1294,7 @@ function ApiTrackPanel({
   const sunoTracks = result?.suno?.tracks?.filter((item) => item.id) ?? [];
   const selectedSunoTrack = sunoTracks.find((item) => item.id === replaceForm.sourceAudioId) ?? sunoTracks[0];
   const firstAudioId = sunoTracks[0]?.id ?? '';
+  const sunoAudioLinks = displayAudioUrls(result?.suno);
 
   useEffect(() => {
     if (!replaceForm.sourceAudioId && firstAudioId) {
@@ -1324,16 +1357,14 @@ function ApiTrackPanel({
       {result?.suno ? (
         <div className="api-result">
           <span>Task: {result.suno.taskId}</span>
-          {result.suno.audioUrls.map((url, index) => (
+          {sunoAudioLinks.map((url, index) => (
             <a key={url} href={url} target="_blank" rel="noreferrer">
               Audio {index + 1}
             </a>
           ))}
-          {result.suno.streamUrls.map((url, index) => (
-            <a key={url} href={url} target="_blank" rel="noreferrer">
-              Stream {index + 1}
-            </a>
-          ))}
+          {!sunoAudioLinks.length && result.suno.status !== 'SUBMITTED' ? (
+            <span>Audio file URL is not available yet; check status again or load callbacks.</span>
+          ) : null}
         </div>
       ) : null}
       {replaceOpen ? (
@@ -1432,16 +1463,14 @@ function ApiTrackPanel({
               >
                 Check replacement
               </button>
-              {replacement.audioUrls.map((url, audioIndex) => (
+              {displayAudioUrls(replacement).map((url, audioIndex) => (
                 <a key={url} href={url} target="_blank" rel="noreferrer">
                   Replacement audio {audioIndex + 1}
                 </a>
               ))}
-              {replacement.streamUrls.map((url, streamIndex) => (
-                <a key={url} href={url} target="_blank" rel="noreferrer">
-                  Replacement stream {streamIndex + 1}
-                </a>
-              ))}
+              {!displayAudioUrls(replacement).length && replacement.status !== 'SUBMITTED' ? (
+                <span>Replacement audio file URL is not available yet; check status again or load callbacks.</span>
+              ) : null}
             </div>
           ))}
         </div>

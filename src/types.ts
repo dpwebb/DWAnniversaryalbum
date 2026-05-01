@@ -96,6 +96,7 @@ export type SunoTrackResult = {
   streamUrls: string[];
   imageUrls?: string[];
   tracks?: SunoGeneratedTrack[];
+  deletedTakeKeys?: string[];
   updatedAt: string;
 };
 
@@ -114,6 +115,7 @@ export type SunoReplacementResult = {
   streamUrls: string[];
   imageUrls?: string[];
   tracks?: SunoGeneratedTrack[];
+  deletedTakeKeys?: string[];
   updatedAt: string;
 };
 

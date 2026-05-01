@@ -594,6 +594,18 @@ pre,
   padding: 0.4rem 0.65rem;
 }
 
+.api-result .take-pill {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.api-result .danger-button {
+  background: #8a1f2d;
+  border-color: #a83c49;
+  color: #fffafa;
+}
+
 .replace-panel {
   background: #0f141b;
   border: 1px solid #303946;

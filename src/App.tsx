@@ -40,6 +40,7 @@ import type {
   SunoCallbackTrack,
   SunoGeneratedTrack,
   SunoReplacementResult,
+  SunoTrackResult,
 } from './types';
 
 const sampleMemories = 'our first trip together, quiet Sunday mornings, the day we knew this was real';
@@ -67,6 +68,15 @@ type SunoSectionReplacementInput = {
   prompt: string;
   tags: string;
   title: string;
+};
+type SunoTakeResult = Pick<
+  SunoTrackResult,
+  'audioUrls' | 'streamUrls' | 'imageUrls' | 'tracks' | 'deletedTakeKeys'
+>;
+type SunoTakeItem = {
+  key: string;
+  url: string;
+  label: string;
 };
 
 function productionCallbackUrl() {
@@ -530,7 +540,7 @@ export default function App() {
         ...current,
         [trackId]: {
           ...current[trackId],
-          suno: { ...result, updatedAt: new Date().toISOString() },
+          suno: mergeSunoTakeResult(current[trackId]?.suno, { ...result, updatedAt: new Date().toISOString() }),
         },
       }));
       setStatus(`Refreshed Suno results for song ${trackId}: ${friendlyStatus(result.status)}.`);
@@ -577,6 +587,42 @@ export default function App() {
     }
   }
 
+  function deleteSunoTake(trackId: number, takeKey: string) {
+    setApiResults((current) => {
+      const result = current[trackId];
+      if (!result?.suno) return current;
+
+      return {
+        ...current,
+        [trackId]: {
+          ...result,
+          suno: deleteSunoTakeFromResult(result.suno, takeKey),
+        },
+      };
+    });
+    setError('');
+    setStatus(`Removed a Suno take from song ${trackId}.`);
+  }
+
+  function deleteSunoReplacementTake(trackId: number, replacementTaskId: string, takeKey: string) {
+    setApiResults((current) => {
+      const result = current[trackId];
+      if (!result?.sunoReplacements?.length) return current;
+
+      return {
+        ...current,
+        [trackId]: {
+          ...result,
+          sunoReplacements: result.sunoReplacements.map((replacement) =>
+            replacement.taskId === replacementTaskId ? deleteSunoTakeFromResult(replacement, takeKey) : replacement,
+          ),
+        },
+      };
+    });
+    setError('');
+    setStatus(`Removed a fixed Suno take from song ${trackId}.`);
+  }
+
   async function checkSunoReplacementStatus(trackId: number, taskId: string) {
     setApiBusy(`suno-replace-check-${trackId}-${taskId}`);
     setError('');
@@ -588,7 +634,7 @@ export default function App() {
           ...current[trackId],
           sunoReplacements: (current[trackId]?.sunoReplacements ?? []).map((replacement) =>
             replacement.taskId === taskId
-              ? {
+              ? mergeSunoTakeResult(replacement, {
                   ...replacement,
                   status: result.status,
                   message: result.message,
@@ -597,7 +643,7 @@ export default function App() {
                   imageUrls: result.imageUrls,
                   tracks: result.tracks,
                   updatedAt: new Date().toISOString(),
-                }
+                })
               : replacement,
           ),
         },
@@ -638,20 +684,20 @@ export default function App() {
             const replacementStatus = callback ? sunoCallbackToResult(callback) : null;
             if (!replacementStatus) return replacement;
             matched += 1;
-            return {
+            return mergeSunoTakeResult(replacement, {
               ...replacement,
               ...replacementStatus,
-            };
+            });
           });
 
           next[Number(trackId)] = {
             ...result,
             suno:
               result.suno && callbackStatus
-                ? {
+                ? mergeSunoTakeResult(result.suno, {
                     ...result.suno,
                     ...callbackStatus,
-                  }
+                  })
                 : result.suno,
             sunoReplacements: sunoReplacements.length ? sunoReplacements : result.sunoReplacements,
           };
@@ -1121,8 +1167,10 @@ export default function App() {
                         busy={apiBusy}
                         onSunoGenerate={sendTrackToSuno}
                         onSunoCheck={checkSunoStatus}
+                        onSunoTakeDelete={deleteSunoTake}
                         onSunoReplace={replaceSunoTrackSection}
                         onSunoReplacementCheck={checkSunoReplacementStatus}
+                        onSunoReplacementTakeDelete={deleteSunoReplacementTake}
                         onKitsConvert={sendTrackToKits}
                         onKitsCheck={checkKitsStatus}
                       />
@@ -1199,8 +1247,94 @@ function sunoImageUrls(tracks: SunoGeneratedTrack[]): string[] {
   return uniqueHttpUrls(tracks.flatMap((track) => [track.imageUrl, track.sourceImageUrl]));
 }
 
-function displayAudioUrls(result?: { audioUrls: string[]; tracks?: SunoGeneratedTrack[] }): string[] {
-  return result?.tracks?.length ? sunoAudioUrls(result.tracks) : uniqueHttpUrls(result?.audioUrls ?? []);
+function sunoTakeItems(result?: SunoTakeResult, fallbackLabel = 'Audio'): SunoTakeItem[] {
+  if (!result) return [];
+  const visible = applyDeletedSunoTakes(result);
+
+  if (visible.tracks?.length) {
+    return visible.tracks
+      .map((track, index) => {
+        const url = firstHttpUrl([track.audioUrl, track.sourceAudioUrl, track.streamAudioUrl, track.sourceStreamAudioUrl]);
+        if (!url) return null;
+        return {
+          key: track.id || url,
+          url,
+          label: track.id ? audioTakeLabel(track, index) : `${fallbackLabel} ${index + 1}`,
+        };
+      })
+      .filter((item): item is SunoTakeItem => Boolean(item));
+  }
+
+  return uniqueHttpUrls(visible.audioUrls).map((url, index) => ({
+    key: url,
+    url,
+    label: `${fallbackLabel} ${index + 1}`,
+  }));
+}
+
+function mergeSunoTakeResult<T extends SunoTakeResult>(previous: SunoTakeResult | undefined, next: T): T {
+  return applyDeletedSunoTakes({
+    ...next,
+    deletedTakeKeys: uniqueStrings([...(next.deletedTakeKeys ?? []), ...(previous?.deletedTakeKeys ?? [])]),
+  });
+}
+
+function deleteSunoTakeFromResult<T extends SunoTakeResult>(result: T, takeKey: string): T {
+  return applyDeletedSunoTakes({
+    ...result,
+    deletedTakeKeys: uniqueStrings([...(result.deletedTakeKeys ?? []), takeKey]),
+  });
+}
+
+function applyDeletedSunoTakes<T extends SunoTakeResult>(result: T): T {
+  const deletedTakeKeys = uniqueStrings(result.deletedTakeKeys ?? []);
+  if (!deletedTakeKeys.length) return result;
+
+  const hiddenKeys = new Set(deletedTakeKeys);
+  const tracks = result.tracks?.filter((track) => {
+    const hidden = deletedTakeKeys.some((key) => sunoTrackMatchesKey(track, key));
+    if (hidden) {
+      sunoTrackKeys(track).forEach((key) => hiddenKeys.add(key));
+    }
+    return !hidden;
+  });
+
+  return {
+    ...result,
+    deletedTakeKeys,
+    tracks,
+    audioUrls: filterHiddenUrls(result.audioUrls, hiddenKeys),
+    streamUrls: filterHiddenUrls(result.streamUrls, hiddenKeys),
+    imageUrls: result.imageUrls ? filterHiddenUrls(result.imageUrls, hiddenKeys) : result.imageUrls,
+  };
+}
+
+function sunoTrackMatchesKey(track: SunoGeneratedTrack, key: string): boolean {
+  return sunoTrackKeys(track).includes(key);
+}
+
+function sunoTrackKeys(track: SunoGeneratedTrack): string[] {
+  return uniqueStrings([
+    track.id,
+    track.audioUrl,
+    track.sourceAudioUrl,
+    track.streamAudioUrl,
+    track.sourceStreamAudioUrl,
+    track.imageUrl,
+    track.sourceImageUrl,
+  ]);
+}
+
+function filterHiddenUrls(urls: string[], hiddenKeys: Set<string>): string[] {
+  return urls.filter((url) => !hiddenKeys.has(url));
+}
+
+function firstHttpUrl(values: string[]): string {
+  return values.find(isHttpUrl) ?? '';
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 function friendlyStatus(status: string): string {
@@ -1392,8 +1526,10 @@ function ApiTrackPanel({
   busy,
   onSunoGenerate,
   onSunoCheck,
+  onSunoTakeDelete,
   onSunoReplace,
   onSunoReplacementCheck,
+  onSunoReplacementTakeDelete,
   onKitsConvert,
   onKitsCheck,
 }: {
@@ -1402,8 +1538,10 @@ function ApiTrackPanel({
   busy: string;
   onSunoGenerate: (track: SongPlan) => void;
   onSunoCheck: (trackId: number) => void;
+  onSunoTakeDelete: (trackId: number, takeKey: string) => void;
   onSunoReplace: (track: SongPlan, request: SunoSectionReplacementInput) => void;
   onSunoReplacementCheck: (trackId: number, taskId: string) => void;
+  onSunoReplacementTakeDelete: (trackId: number, replacementTaskId: string, takeKey: string) => void;
   onKitsConvert: (trackId: number, file: File) => void;
   onKitsCheck: (trackId: number) => void;
 }) {
@@ -1416,15 +1554,16 @@ function ApiTrackPanel({
     tags: track.genreStyle,
     title: `${track.title} section fix`,
   });
-  const sunoTracks = result?.suno?.tracks?.filter((item) => item.id) ?? [];
+  const visibleSuno = result?.suno ? applyDeletedSunoTakes(result.suno) : undefined;
+  const sunoTracks = visibleSuno?.tracks?.filter((item) => item.id) ?? [];
   const selectedSunoTrack = sunoTracks.find((item) => item.id === replaceForm.sourceAudioId) ?? sunoTracks[0];
   const firstAudioId = sunoTracks[0]?.id ?? '';
-  const sunoAudioLinks = displayAudioUrls(result?.suno);
+  const sunoTakes = sunoTakeItems(visibleSuno);
   const sunoBusy = busy === `suno-${track.id}`;
   const sunoStatus = result?.suno?.status ?? '';
   const showWaitingForAudio =
     result?.suno &&
-    !sunoAudioLinks.length &&
+    !sunoTakes.length &&
     !['SENDING', 'SUBMITTED', 'ERROR', 'FAILED'].includes(sunoStatus.toUpperCase());
 
   useEffect(() => {
@@ -1489,10 +1628,15 @@ function ApiTrackPanel({
         <div className="api-result">
           {result.suno.taskId ? <span>Suno reference: {result.suno.taskId}</span> : null}
           {result.suno.message ? <span>{result.suno.message}</span> : null}
-          {sunoAudioLinks.map((url, index) => (
-            <a key={url} href={url} target="_blank" rel="noreferrer">
-              Audio {index + 1}
-            </a>
+          {sunoTakes.map((item) => (
+            <span className="take-pill" key={item.key}>
+              <a href={item.url} target="_blank" rel="noreferrer">
+                {item.label}
+              </a>
+              <button type="button" className="danger-button compact-button" onClick={() => onSunoTakeDelete(track.id, item.key)}>
+                Remove
+              </button>
+            </span>
           ))}
           {showWaitingForAudio ? (
             <span>Finished audio is not ready yet. Refresh results or bring in finished songs.</span>
@@ -1582,29 +1726,41 @@ function ApiTrackPanel({
       ) : null}
       {result?.sunoReplacements?.length ? (
         <div className="replacement-list">
-          {result.sunoReplacements.map((replacement, index) => (
-            <div className="api-result" key={replacement.taskId}>
-              <span>Fix {index + 1}: {friendlyStatus(replacement.status)}</span>
-              <span>
-                {formatSeconds(replacement.infillStartS)}-{formatSeconds(replacement.infillEndS)}
-              </span>
-              <button
-                type="button"
-                onClick={() => onSunoReplacementCheck(track.id, replacement.taskId)}
-                disabled={busy === `suno-replace-check-${track.id}-${replacement.taskId}`}
-              >
-                Refresh fix
-              </button>
-              {displayAudioUrls(replacement).map((url, audioIndex) => (
-                <a key={url} href={url} target="_blank" rel="noreferrer">
-                  Fixed audio {audioIndex + 1}
-                </a>
-              ))}
-              {!displayAudioUrls(replacement).length && replacement.status !== 'SUBMITTED' ? (
-                <span>Fixed audio is not ready yet. Refresh the fix or bring in finished songs.</span>
-              ) : null}
-            </div>
-          ))}
+          {result.sunoReplacements.map((replacement, index) => {
+            const replacementTakes = sunoTakeItems(replacement, 'Fixed audio');
+            return (
+              <div className="api-result" key={replacement.taskId}>
+                <span>Fix {index + 1}: {friendlyStatus(replacement.status)}</span>
+                <span>
+                  {formatSeconds(replacement.infillStartS)}-{formatSeconds(replacement.infillEndS)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onSunoReplacementCheck(track.id, replacement.taskId)}
+                  disabled={busy === `suno-replace-check-${track.id}-${replacement.taskId}`}
+                >
+                  Refresh fix
+                </button>
+                {replacementTakes.map((item) => (
+                  <span className="take-pill" key={item.key}>
+                    <a href={item.url} target="_blank" rel="noreferrer">
+                      {item.label}
+                    </a>
+                    <button
+                      type="button"
+                      className="danger-button compact-button"
+                      onClick={() => onSunoReplacementTakeDelete(track.id, replacement.taskId, item.key)}
+                    >
+                      Remove
+                    </button>
+                  </span>
+                ))}
+                {!replacementTakes.length && replacement.status !== 'SUBMITTED' ? (
+                  <span>Fixed audio is not ready yet. Refresh the fix or bring in finished songs.</span>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       ) : null}
 

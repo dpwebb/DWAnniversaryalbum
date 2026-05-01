@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import albumDraft from '../album.json';
 import { defaultInputs } from './data/defaults';
 import {
@@ -47,6 +47,7 @@ const samplePlaces = 'home, the beach, our favorite restaurant';
 const sampleJokes = 'the parking lot debate, our secret phrase, the wrong-turn adventure';
 const bundledDraft = albumDraft as DraftState;
 type DraftPayload = Partial<DraftState> & { inputs: Partial<AlbumInputs> };
+type JsonRecord = Record<string, unknown>;
 type EditableTrackTextKey =
   | 'title'
   | 'genreStyle'
@@ -108,6 +109,20 @@ function normalizeDraft(draft: DraftPayload): DraftState {
     generationCount,
     apiResults: draft.apiResults ?? {},
   };
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function draftFromJsonText(jsonText: string, sourceLabel: string): DraftPayload {
+  const parsed = JSON.parse(jsonText) as unknown;
+
+  if (!isRecord(parsed) || !isRecord(parsed.inputs)) {
+    throw new Error(`${sourceLabel} is missing the story notes.`);
+  }
+
+  return { ...parsed, inputs: parsed.inputs } as DraftPayload;
 }
 
 export default function App() {
@@ -324,20 +339,35 @@ export default function App() {
 
   function importDraftJson() {
     try {
-      const parsed = JSON.parse(importDraftText) as Partial<DraftState> & {
-        inputs?: Partial<AlbumInputs>;
-        album?: AlbumPlan | null;
-      };
-      if (!parsed.inputs) {
-        throw new Error('Backup text is missing the story notes.');
-      }
-
-      applyDraft({ ...parsed, inputs: parsed.inputs });
+      applyDraft(draftFromJsonText(importDraftText, 'Backup text'));
       setImportDraftText('');
       setStatus('Restored the backup text.');
       setError('');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to restore that backup text.');
+    }
+  }
+
+  async function importDraftFile(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = '';
+
+    if (!file) return;
+
+    const isJsonFile = file.name.toLowerCase().endsWith('.json') || file.type === 'application/json';
+    if (!isJsonFile) {
+      setError('Choose a .json backup file.');
+      return;
+    }
+
+    try {
+      applyDraft(draftFromJsonText(await file.text(), 'Backup file'));
+      setImportDraftText('');
+      setStatus(`Loaded ${file.name}.`);
+      setError('');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to load that backup file.');
     }
   }
 
@@ -831,6 +861,15 @@ export default function App() {
               onChange={setImportDraftText}
             />
             <div className="action-row">
+              <label className="file-button">
+                Load backup file
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  aria-label="Load backup JSON file"
+                  onChange={importDraftFile}
+                />
+              </label>
               <button type="button" className="ghost-button" onClick={importDraftJson} disabled={!importDraftText.trim()}>
                 Restore backup
               </button>

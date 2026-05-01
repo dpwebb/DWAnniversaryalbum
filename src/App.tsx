@@ -82,6 +82,16 @@ function normalizeDraft(draft: DraftPayload): DraftState {
     };
   }
 
+  if (album) {
+    album = {
+      ...album,
+      tracks: album.tracks.map((track) => ({
+        ...track,
+        lyricsLocked: track.lyricsLocked ?? Boolean(track.lyrics.trim()),
+      })),
+    };
+  }
+
   return {
     inputs,
     album,
@@ -193,17 +203,35 @@ export default function App() {
   function handleTrackAction(trackId: number, action: 'song' | 'lyrics' | 'prompt') {
     if (!album) return;
     const nextCount = generationCount + 1;
-    const nextAlbum =
+    const changedAlbum =
       action === 'song'
         ? regenerateSong(inputs, album, trackId, nextCount)
         : action === 'lyrics'
           ? regenerateLyrics(inputs, album, trackId, nextCount)
           : regenerateMusicPrompt(inputs, album, trackId, nextCount);
+    const currentTrack = album.tracks.find((track) => track.id === trackId);
+    const nextAlbum =
+      action === 'song' && currentTrack?.lyricsLocked
+        ? {
+            ...changedAlbum,
+            tracks: changedAlbum.tracks.map((track) =>
+              track.id === trackId
+                ? {
+                    ...track,
+                    lyrics: currentTrack.lyrics,
+                    lyricsLocked: true,
+                  }
+                : track,
+            ),
+          }
+        : changedAlbum;
     setAlbum(nextAlbum);
     setGenerationCount(nextCount);
     setStatus(
       action === 'song'
-        ? `Regenerated track ${trackId}.`
+        ? currentTrack?.lyricsLocked
+          ? `Regenerated track ${trackId} while preserving locked lyrics.`
+          : `Regenerated track ${trackId}.`
         : action === 'lyrics'
           ? `Regenerated lyrics for track ${trackId}.`
           : `Regenerated the music prompt for track ${trackId}.`,
@@ -215,10 +243,30 @@ export default function App() {
       if (!current) return current;
       return {
         ...current,
-        tracks: current.tracks.map((track) => (track.id === trackId ? { ...track, [key]: value } : track)),
+        tracks: current.tracks.map((track) => {
+          if (track.id !== trackId) return track;
+          if (key === 'lyrics' && track.lyricsLocked) return track;
+          return { ...track, [key]: value };
+        }),
+      };
+    });
+    if (key === 'lyrics' && album?.tracks.find((track) => track.id === trackId)?.lyricsLocked) {
+      setError('Unlock the lyrics before editing them.');
+      return;
+    }
+    setError('');
+  }
+
+  function setTrackLyricsLocked(trackId: number, lyricsLocked: boolean) {
+    setAlbum((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        tracks: current.tracks.map((track) => (track.id === trackId ? { ...track, lyricsLocked } : track)),
       };
     });
     setError('');
+    setStatus(lyricsLocked ? `Locked lyrics for track ${trackId}.` : `Unlocked lyrics for track ${trackId}.`);
   }
 
   async function copyAlbum() {
@@ -948,7 +996,12 @@ export default function App() {
               <div className="track-list">
                 {album.tracks.map((track) => (
                   <div className="track-stack" key={track.id}>
-                    <TrackCard track={track} onAction={handleTrackAction} onEdit={updateTrackText} />
+                    <TrackCard
+                      track={track}
+                      onAction={handleTrackAction}
+                      onEdit={updateTrackText}
+                      onLyricsLockChange={setTrackLyricsLocked}
+                    />
                     <ApiTrackPanel
                       track={track}
                       result={apiResults[track.id]}
@@ -1050,10 +1103,12 @@ function TrackCard({
   track,
   onAction,
   onEdit,
+  onLyricsLockChange,
 }: {
   track: SongPlan;
   onAction: (trackId: number, action: 'song' | 'lyrics' | 'prompt') => void;
   onEdit: (trackId: number, key: 'lyrics' | 'musicPrompt', value: string) => void;
+  onLyricsLockChange: (trackId: number, lyricsLocked: boolean) => void;
 }) {
   const [open, setOpen] = useState(track.id === 1);
 
@@ -1104,11 +1159,24 @@ function TrackCard({
             </div>
           </dl>
           <section>
-            <h3>Original lyrics draft</h3>
+            <div className="section-heading">
+              <div>
+                <h3>Original lyrics draft</h3>
+                <span className="lock-status">{track.lyricsLocked ? 'Locked' : 'Unlocked for editing'}</span>
+              </div>
+              <button
+                type="button"
+                className="ghost-button compact-button"
+                onClick={() => onLyricsLockChange(track.id, !track.lyricsLocked)}
+              >
+                {track.lyricsLocked ? 'Unlock lyrics' : 'Lock lyrics'}
+              </button>
+            </div>
             <textarea
               className="track-textarea lyrics-editor"
               aria-label={`Original lyrics draft for ${track.title}`}
               value={track.lyrics}
+              readOnly={track.lyricsLocked}
               onChange={(event) => onEdit(track.id, 'lyrics', event.target.value)}
             />
           </section>

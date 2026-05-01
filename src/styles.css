@@ -373,7 +373,28 @@ dd {
 .track-body h3 {
   color: #3d2e2a;
   font-size: 1rem;
-  margin: 0 0 8px;
+  margin: 0;
+}
+
+.section-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.lock-status {
+  color: #78665f;
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+.compact-button {
+  min-height: 34px;
+  padding: 0.42rem 0.7rem;
 }
 
 pre,
@@ -396,6 +417,12 @@ pre,
   display: block;
   min-height: 300px;
   resize: vertical;
+}
+
+.track-textarea:read-only {
+  background: #f4ece8;
+  color: #4c3c37;
+  cursor: default;
 }
 
 .prompt-editor {
@@ -560,7 +587,8 @@ pre,
 
   .panel-heading,
   .album-toolbar,
-  .track-header {
+  .track-header,
+  .section-heading {
     display: grid;
   }
 

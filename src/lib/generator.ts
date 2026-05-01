@@ -235,6 +235,7 @@ function buildSong(inputs: AlbumInputs, seed: number, trackNumber: number): Song
     shortDescription,
     dedicationNote,
     lyrics,
+    lyricsLocked: true,
     vocalStyle: pick(vocalStyles, seed + trackNumber * 23),
     instrumentation: pick(instruments, seed + trackNumber * 29),
     musicPrompt: '',
@@ -293,6 +294,7 @@ export function regenerateLyrics(inputs: AlbumInputs, album: AlbumPlan, trackId:
         ? {
             ...track,
             lyrics: buildLyrics(inputs, seed, trackId),
+            lyricsLocked: true,
           }
         : track,
     ),

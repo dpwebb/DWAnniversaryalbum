@@ -20,6 +20,7 @@ export type SongPlan = {
   shortDescription: string;
   dedicationNote: string;
   lyrics: string;
+  lyricsLocked: boolean;
   vocalStyle: string;
   instrumentation: string;
   musicPrompt: string;

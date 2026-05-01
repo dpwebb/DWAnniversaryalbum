@@ -8,6 +8,7 @@ The app works without a backend or AI API. It uses a deterministic template-base
 
 - Guided inputs for anniversary details, names, memories, places, inside jokes, genres, emotional tone, custom lyric instructions, and phrase preferences.
 - Generates a complete 13-song album plan with title, concept, track list, original lyrics drafts, instrumentation, vocal style, dedication notes, and AI music tool prompts.
+- Locks completed lyric drafts by default; unlock a track's lyrics before manually editing them.
 - Regenerate the entire album, a single song, title only, lyrics only, or music prompt only.
 - Export to Markdown, PDF-ready HTML, JSON, or copy the full album plan to the clipboard.
 - Sync drafts to GitHub using the GitHub Contents API.

@@ -9,6 +9,7 @@ export const defaultInputs: AlbumInputs = {
   insideJokes: '',
   genres: '',
   tone: '',
+  lyricInstructions: '',
   includeWords: '',
   avoidWords: '',
 };

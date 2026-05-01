@@ -1,4 +1,5 @@
 import type { AlbumInputs, AlbumPlan, SongPlan } from '../types';
+import { formatLyricsForSuno } from './lyrics';
 import { hashText, pick, sanitizeWords, sentenceJoin, splitList } from './text';
 
 const trackArcs = [
@@ -142,11 +143,12 @@ function contextFromInputs(inputs: AlbumInputs) {
   const includes = splitList(inputs.includeWords);
   const avoids = splitList(inputs.avoidWords);
   const tone = inputs.tone.trim() || 'tender, grateful, hopeful';
+  const lyricInstructions = inputs.lyricInstructions.trim();
   const myName = inputs.myName.trim() || 'me';
   const wifeName = inputs.wifeName.trim() || 'Robbin';
   const anniversary = inputs.anniversary.trim() || 'this anniversary';
 
-  return { memories, places, jokes, genres, includes, avoids, tone, myName, wifeName, anniversary };
+  return { memories, places, jokes, genres, includes, avoids, tone, lyricInstructions, myName, wifeName, anniversary };
 }
 
 function lineSet(seed: number, trackIndex: number, inputs: AlbumInputs): string[] {
@@ -223,7 +225,7 @@ function buildSong(inputs: AlbumInputs, seed: number, trackNumber: number): Song
   );
   const shortDescription = sanitizeWords(`${arc.description} It draws from ${memory} and ${place}.`, ctx.avoids);
   const dedicationNote = sanitizeWords(`For ${ctx.wifeName}, from ${ctx.myName}, with a nod to ${joke}.`, ctx.avoids);
-  const lyrics = sanitizeWords(lineSet(seed, trackNumber, inputs).join('\n\n'), ctx.avoids);
+  const lyrics = buildLyrics(inputs, seed, trackNumber);
 
   const song: SongPlan = {
     id: trackNumber,
@@ -283,7 +285,6 @@ export function regenerateSong(inputs: AlbumInputs, album: AlbumPlan, trackId: n
 }
 
 export function regenerateLyrics(inputs: AlbumInputs, album: AlbumPlan, trackId: number, generationCount: number): AlbumPlan {
-  const ctx = contextFromInputs(inputs);
   const seed = hashText(`${album.seed}:lyrics:${trackId}:${generationCount}`);
   return {
     ...album,
@@ -291,7 +292,7 @@ export function regenerateLyrics(inputs: AlbumInputs, album: AlbumPlan, trackId:
       track.id === trackId
         ? {
             ...track,
-            lyrics: sanitizeWords(lineSet(seed, trackId, inputs).join('\n\n'), ctx.avoids),
+            lyrics: buildLyrics(inputs, seed, trackId),
           }
         : track,
     ),
@@ -318,10 +319,22 @@ export function regenerateMusicPrompt(inputs: AlbumInputs, album: AlbumPlan, tra
 function buildMusicPrompt(inputs: AlbumInputs, song: SongPlan, seed: number): string {
   const ctx = contextFromInputs(inputs);
   const tempo = pick(['72 BPM', '82 BPM', '94 BPM', '104 BPM', 'slow 6/8 feel', 'mid-tempo 4/4'], seed);
+  const lyricDirection = ctx.lyricInstructions ? ` Lyric direction: ${compactInstruction(ctx.lyricInstructions)}.` : '';
   return sanitizeWords(
-    `Create an original ${song.genreStyle} anniversary song at ${tempo}. Tone: ${ctx.tone}. Theme: ${song.emotionalPurpose} for ${ctx.wifeName}. Vocal style: ${song.vocalStyle}. Instrumentation: ${song.instrumentation}. Shape the arrangement around the lyric sections and keep the hook memorable without copying any existing song. Keep lyrics original, sincere, adult, romantic but not cheesy. Do not imitate any living artist or use copyrighted lyrics.`,
+    `Create an original ${song.genreStyle} anniversary song at ${tempo}. Tone: ${ctx.tone}. Theme: ${song.emotionalPurpose} for ${ctx.wifeName}.${lyricDirection} Vocal style: ${song.vocalStyle}. Instrumentation: ${song.instrumentation}. Shape the arrangement around the lyric sections and keep the hook memorable without copying any existing song. Keep lyrics original, sincere, adult, romantic but not cheesy. Do not imitate any living artist or use copyrighted lyrics.`,
     ctx.avoids,
   );
+}
+
+function buildLyrics(inputs: AlbumInputs, seed: number, trackNumber: number): string {
+  const ctx = contextFromInputs(inputs);
+  const lyricDirection = ctx.lyricInstructions ? `[Lyric direction: ${compactInstruction(ctx.lyricInstructions)}]` : '';
+  const lyrics = sanitizeWords([lyricDirection, lineSet(seed, trackNumber, inputs).join('\n\n')].filter(Boolean).join('\n\n'), ctx.avoids);
+  return formatLyricsForSuno(lyrics);
+}
+
+function compactInstruction(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
 }
 
 function capitalize(value: string): string {

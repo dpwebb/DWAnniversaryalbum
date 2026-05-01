@@ -6,7 +6,7 @@ The app works without a backend or AI API. It uses a deterministic template-base
 
 ## Features
 
-- Guided inputs for anniversary details, names, memories, places, inside jokes, genres, emotional tone, and phrase preferences.
+- Guided inputs for anniversary details, names, memories, places, inside jokes, genres, emotional tone, custom lyric instructions, and phrase preferences.
 - Generates a complete 13-song album plan with title, concept, track list, original lyrics drafts, instrumentation, vocal style, dedication notes, and AI music tool prompts.
 - Regenerate the entire album, a single song, title only, lyrics only, or music prompt only.
 - Export to Markdown, PDF-ready HTML, JSON, or copy the full album plan to the clipboard.
@@ -27,7 +27,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite, usually `http://localhost:5173`.
+Open the local URL printed by Vite, configured for `http://localhost:5175`.
 
 ## Build
 
@@ -53,7 +53,7 @@ The app still works locally without these APIs. Add tokens only when you want to
 - Add a Suno API bearer token in the Music APIs panel.
 - Choose the Suno model and vocal settings.
 - Each track has `Generate` and `Check` actions.
-- The app submits each track with custom mode enabled, using the original lyrics draft unless instrumental mode is selected.
+- The app submits each track with custom mode enabled, using the original lyrics draft and any custom lyric instructions unless instrumental mode is selected.
 
 #### Suno Callback Receiver
 

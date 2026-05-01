@@ -1,4 +1,5 @@
 import type { KitsSettings, KitsVoiceModel, SongPlan, SunoCallbackRecord, SunoSettings } from '../types';
+import { formatLyricsForSuno } from './lyrics';
 
 const SUNO_BASE_URL = 'https://api.sunoapi.org/api/v1';
 const KITS_BASE_URL = 'https://arpeggi.io/api/kits/v1';
@@ -34,11 +35,13 @@ type KitsVoiceModelsResponse = {
   data: KitsVoiceModel[];
 };
 
-export async function createSunoSong(settings: SunoSettings, song: SongPlan): Promise<string> {
+export async function createSunoSong(settings: SunoSettings, song: SongPlan, lyricInstructions = ''): Promise<string> {
   if (!settings.token.trim()) {
     throw new Error('Suno API token is required.');
   }
 
+  const compactLyricInstructions = compactSunoText(lyricInstructions);
+  const sunoLyrics = formatLyricsForSuno(song.lyrics);
   const body = {
     customMode: true,
     instrumental: settings.instrumental,
@@ -46,8 +49,8 @@ export async function createSunoSong(settings: SunoSettings, song: SongPlan): Pr
     callBackUrl: settings.callbackUrl || undefined,
     prompt: settings.instrumental
       ? song.musicPrompt.slice(0, sunoPromptLimit(settings.model))
-      : song.lyrics.slice(0, sunoPromptLimit(settings.model)),
-    style: buildSunoStyle(song).slice(0, sunoStyleLimit(settings.model)),
+      : buildSunoLyricsPrompt(sunoLyrics, compactLyricInstructions).slice(0, sunoPromptLimit(settings.model)),
+    style: buildSunoStyle(song, compactLyricInstructions).slice(0, sunoStyleLimit(settings.model)),
     title: song.title.slice(0, sunoTitleLimit(settings.model)),
     negativeTags: settings.negativeTags || undefined,
     vocalGender: settings.vocalGender || undefined,
@@ -203,11 +206,25 @@ function appendOptionalNumber(form: FormData, key: string, value: string): void 
   }
 }
 
-function buildSunoStyle(song: SongPlan): string {
+function buildSunoLyricsPrompt(lyrics: string, lyricInstructions: string): string {
+  if (!lyricInstructions) {
+    return lyrics;
+  }
+
+  const direction = `[Lyric direction: ${lyricInstructions}]`;
+  if (/^\s*\[Lyric direction:[^\]]*\]/i.test(lyrics)) {
+    return lyrics.replace(/^\s*\[Lyric direction:[^\]]*\]\s*/i, `${direction}\n\n`);
+  }
+
+  return `${direction}\n\n${lyrics}`;
+}
+
+function buildSunoStyle(song: SongPlan, lyricInstructions: string): string {
   return compactSunoText(
     [
       song.genreStyle,
       song.musicPrompt,
+      lyricInstructions ? `Lyric direction: ${lyricInstructions}` : '',
       `Vocal style: ${song.vocalStyle}`,
       `Instrumentation: ${song.instrumentation}`,
       `Theme: ${song.emotionalPurpose}`,

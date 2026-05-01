@@ -7,6 +7,7 @@ export type AlbumInputs = {
   insideJokes: string;
   genres: string;
   tone: string;
+  lyricInstructions: string;
   includeWords: string;
   avoidWords: string;
 };

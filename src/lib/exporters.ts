@@ -7,6 +7,7 @@ export function albumToMarkdown(inputs: AlbumInputs, album: AlbumPlan): string {
     `**For:** ${inputs.wifeName || 'Robbin'}`,
     `**From:** ${inputs.myName || ''}`,
     `**Anniversary:** ${inputs.anniversary || ''}`,
+    inputs.lyricInstructions ? `**Lyric Instructions:** ${inputs.lyricInstructions}` : '',
     '',
     '## Album Concept',
     '',
@@ -39,7 +40,8 @@ export function albumToHtml(inputs: AlbumInputs, album: AlbumPlan): string {
   <h1>${escapeHtml(album.title)}</h1>
   <p class="meta"><strong>For:</strong> ${escapeHtml(inputs.wifeName || 'Robbin')}<br>
   <strong>From:</strong> ${escapeHtml(inputs.myName || '')}<br>
-  <strong>Anniversary:</strong> ${escapeHtml(inputs.anniversary || '')}</p>
+  <strong>Anniversary:</strong> ${escapeHtml(inputs.anniversary || '')}${inputs.lyricInstructions ? `<br>
+  <strong>Lyric Instructions:</strong> ${escapeHtml(inputs.lyricInstructions)}` : ''}</p>
   <h2>Album Concept</h2>
   <p>${escapeHtml(album.concept)}</p>
   <h2>Track List</h2>

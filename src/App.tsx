@@ -42,17 +42,23 @@ const sampleMemories = 'our first trip together, quiet Sunday mornings, the day 
 const samplePlaces = 'home, the beach, our favorite restaurant';
 const sampleJokes = 'the parking lot debate, our secret phrase, the wrong-turn adventure';
 const bundledDraft = albumDraft as DraftState;
+type DraftPayload = Partial<DraftState> & { inputs: Partial<AlbumInputs> };
 
 function productionCallbackUrl() {
   return `${window.location.origin}/api/suno/callback`;
 }
 
-function normalizeDraft(draft: Partial<DraftState> & { inputs: AlbumInputs }): DraftState {
+function normalizeInputs(inputs: Partial<AlbumInputs>): AlbumInputs {
+  return { ...defaultInputs, ...inputs, lyricInstructions: inputs.lyricInstructions ?? '' };
+}
+
+function normalizeDraft(draft: DraftPayload): DraftState {
+  const inputs = normalizeInputs(draft.inputs);
   const generationCount = draft.generationCount ?? 0;
   let album = draft.album ?? null;
 
   if (album && (!Array.isArray(album.tracks) || album.tracks.length !== 13)) {
-    const generatedAlbum = generateAlbum(draft.inputs, generationCount);
+    const generatedAlbum = generateAlbum(inputs, generationCount);
     album = {
       ...generatedAlbum,
       title: album.title || generatedAlbum.title,
@@ -63,7 +69,7 @@ function normalizeDraft(draft: Partial<DraftState> & { inputs: AlbumInputs }): D
   }
 
   return {
-    inputs: draft.inputs,
+    inputs,
     album,
     generationCount,
     apiResults: draft.apiResults ?? {},
@@ -247,7 +253,7 @@ export default function App() {
   function importDraftJson() {
     try {
       const parsed = JSON.parse(importDraftText) as Partial<DraftState> & {
-        inputs?: AlbumInputs;
+        inputs?: Partial<AlbumInputs>;
         album?: AlbumPlan | null;
       };
       if (!parsed.inputs) {
@@ -263,7 +269,7 @@ export default function App() {
     }
   }
 
-  function applyDraft(draft: Partial<DraftState> & { inputs: AlbumInputs }) {
+  function applyDraft(draft: DraftPayload) {
     const normalizedDraft = normalizeDraft(draft);
     setInputs(normalizedDraft.inputs);
     setAlbum(normalizedDraft.album);
@@ -336,7 +342,7 @@ export default function App() {
     setApiBusy(`suno-${track.id}`);
     setError('');
     try {
-      const taskId = await createSunoSong(apiSettings.suno, track);
+      const taskId = await createSunoSong(apiSettings.suno, track, inputs.lyricInstructions);
       setApiResults((current) => ({
         ...current,
         [track.id]: {
@@ -565,6 +571,12 @@ export default function App() {
             value={inputs.tone}
             placeholder="Tender, grateful, grown-up, hopeful, quietly romantic"
             onChange={(value) => updateInput('tone', value)}
+          />
+          <TextArea
+            label="Custom lyric instructions"
+            value={inputs.lyricInstructions}
+            placeholder="Example: make every chorus end with infinity plus one, keep the verses bluesy and conversational, avoid direct references to hardship"
+            onChange={(value) => updateInput('lyricInstructions', value)}
           />
           <div className="field-grid two">
             <TextArea

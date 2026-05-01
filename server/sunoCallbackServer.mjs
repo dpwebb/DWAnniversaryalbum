@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { handleSunoApiProxy } from './sunoApiProxy.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, '..', 'data');
@@ -20,6 +21,10 @@ const server = createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/health') {
       return sendJson(res, 200, { ok: true, service: 'suno-callback-server' });
+    }
+
+    if (await handleSunoApiProxy(req, res, url, readJsonBody)) {
+      return undefined;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/suno/callback') {
@@ -119,7 +124,7 @@ async function writeCallbacks(callbacks) {
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
 }
 
 function sendJson(res, status, payload) {

@@ -1,18 +1,20 @@
 import type { KitsSettings, KitsVoiceModel, SongPlan, SunoCallbackRecord, SunoGeneratedTrack, SunoSettings } from '../types';
 import { formatLyricsForSuno } from './lyrics';
 
-const SUNO_BASE_URL = 'https://api.sunoapi.org/api/v1';
+const SUNO_PROXY_BASE_PATH = '/api/suno';
 const KITS_BASE_URL = 'https://arpeggi.io/api/kits/v1';
 
 type SunoGenerateResponse = {
   code: number;
   msg: string;
   data?: { taskId?: string };
+  error?: string;
 };
 
 type SunoRecordResponse = {
   code: number;
   msg: string;
+  error?: string;
   data?: {
     taskId?: string;
     status?: string;
@@ -81,7 +83,7 @@ export async function createSunoSong(settings: SunoSettings, song: SongPlan, lyr
     vocalGender: settings.vocalGender || undefined,
   };
 
-  const response = await fetch(`${SUNO_BASE_URL}/generate`, {
+  const response = await fetch(`${SUNO_PROXY_BASE_PATH}/generate`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${settings.token}`,
@@ -92,7 +94,7 @@ export async function createSunoSong(settings: SunoSettings, song: SongPlan, lyr
 
   const payload = (await response.json()) as SunoGenerateResponse;
   if (!response.ok || payload.code !== 200 || !payload.data?.taskId) {
-    throw new Error(payload.msg || 'Suno did not return a task ID.');
+    throw new Error(payload.msg || payload.error || 'Suno did not return a task ID.');
   }
 
   return payload.data.taskId;
@@ -152,7 +154,7 @@ export async function replaceSunoSection(settings: SunoSettings, request: SunoRe
     callBackUrl: settings.callbackUrl || undefined,
   };
 
-  const response = await fetch(`${SUNO_BASE_URL}/generate/replace-section`, {
+  const response = await fetch(`${SUNO_PROXY_BASE_PATH}/generate/replace-section`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${settings.token}`,
@@ -163,7 +165,7 @@ export async function replaceSunoSection(settings: SunoSettings, request: SunoRe
 
   const payload = (await response.json()) as SunoGenerateResponse;
   if (!response.ok || payload.code !== 200 || !payload.data?.taskId) {
-    throw new Error(payload.msg || 'Suno did not return a replacement task ID.');
+    throw new Error(payload.msg || payload.error || 'Suno did not return a replacement task ID.');
   }
 
   return payload.data.taskId;
@@ -177,7 +179,7 @@ export async function getSunoSong(settings: SunoSettings, taskId: string) {
     throw new Error('Suno task ID is required.');
   }
 
-  const url = new URL(`${SUNO_BASE_URL}/generate/record-info`);
+  const url = new URL(`${SUNO_PROXY_BASE_PATH}/generate/record-info`, window.location.origin);
   url.searchParams.set('taskId', taskId.trim());
 
   const response = await fetch(url, {
@@ -188,7 +190,7 @@ export async function getSunoSong(settings: SunoSettings, taskId: string) {
   const payload = (await response.json()) as SunoRecordResponse;
 
   if (!response.ok || payload.code !== 200 || !payload.data) {
-    throw new Error(payload.msg || 'Unable to fetch Suno task status.');
+    throw new Error(payload.msg || payload.error || 'Unable to fetch Suno task status.');
   }
 
   const tracks = normalizeSunoTracks(payload.data.response?.sunoData ?? []);

@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { extname, dirname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { handleSunoApiProxy } from './sunoApiProxy.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
@@ -36,6 +37,10 @@ const server = createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/health') {
       return sendJson(res, 200, { ok: true, service: 'anniversary-album-maker' });
+    }
+
+    if (await handleSunoApiProxy(req, res, url, readJsonBody)) {
+      return undefined;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/suno/callback') {
@@ -165,7 +170,7 @@ async function writeCallbacks(callbacks) {
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
 }
 
 function sendJson(res, status, payload) {

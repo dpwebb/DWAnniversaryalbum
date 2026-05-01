@@ -353,7 +353,7 @@ function buildSunoLyricsPrompt(lyrics: string, lyricInstructions: string): strin
 function buildSunoStyle(song: SongPlan, lyricInstructions: string): string {
   return compactSunoText(
     [
-      song.genreStyle,
+      `Selected genre: ${song.genreStyle}`,
       song.musicPrompt,
       lyricInstructions ? `Lyric direction: ${lyricInstructions}` : '',
       `Vocal style: ${song.vocalStyle}`,

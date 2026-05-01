@@ -47,6 +47,21 @@ const sampleMemories = 'our first trip together, quiet Sunday mornings, the day 
 const samplePlaces = 'home, the beach, our favorite restaurant';
 const sampleJokes = 'the parking lot debate, our secret phrase, the wrong-turn adventure';
 const bundledDraft = albumDraft as DraftState;
+const defaultTrackGenres = [
+  'Blues',
+  'Soul',
+  'R&B',
+  'Acoustic pop',
+  'Folk pop',
+  'Soft rock',
+  'Country',
+  'Americana',
+  'Piano ballad',
+  'Singer-songwriter',
+  'Jazz',
+  'Gospel',
+  'Cinematic pop',
+];
 type DraftPayload = Partial<DraftState> & { inputs: Partial<AlbumInputs> };
 type JsonRecord = Record<string, unknown>;
 type EditableTrackTextKey =
@@ -85,6 +100,21 @@ function productionCallbackUrl() {
 
 function normalizeInputs(inputs: Partial<AlbumInputs>): AlbumInputs {
   return { ...defaultInputs, ...inputs, lyricInstructions: inputs.lyricInstructions ?? '' };
+}
+
+function buildTrackGenreOptions(preferredGenres: string, tracks: SongPlan[]): string[] {
+  return uniqueStrings([
+    ...splitGenreOptions(preferredGenres),
+    ...tracks.map((track) => track.genreStyle),
+    ...defaultTrackGenres,
+  ]);
+}
+
+function splitGenreOptions(value: string): string[] {
+  return value
+    .split(/[\n,;|]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizeDraft(draft: DraftPayload): DraftState {
@@ -177,6 +207,10 @@ export default function App() {
   const [importDraftText, setImportDraftText] = useState('');
   const [status, setStatus] = useState('Your session is saved on this computer.');
   const [error, setError] = useState('');
+  const trackGenreOptions = useMemo(
+    () => buildTrackGenreOptions(inputs.genres, album?.tracks ?? []),
+    [inputs.genres, album?.tracks],
+  );
 
   useEffect(() => {
     const draft: DraftState = { inputs, album, generationCount, apiResults };
@@ -1156,6 +1190,7 @@ export default function App() {
                     <div className="track-stack" key={track.id}>
                       <TrackCard
                         track={track}
+                        genreOptions={trackGenreOptions}
                         onAction={handleTrackAction}
                         onEdit={updateTrackText}
                         onDelete={deleteTrack}
@@ -1397,12 +1432,14 @@ function TextArea({ label, value, placeholder, onChange }: FieldProps) {
 
 function TrackCard({
   track,
+  genreOptions,
   onAction,
   onEdit,
   onDelete,
   onLyricsLockChange,
 }: {
   track: SongPlan;
+  genreOptions: string[];
   onAction: (trackId: number, action: 'song' | 'lyrics' | 'prompt') => void;
   onEdit: (trackId: number, key: EditableTrackTextKey, value: string) => void;
   onDelete: (trackId: number) => void;
@@ -1430,7 +1467,13 @@ function TrackCard({
             </label>
             <label className="inline-field">
               <span>Genre</span>
-              <input value={track.genreStyle} onChange={(event) => onEdit(track.id, 'genreStyle', event.target.value)} />
+              <select value={track.genreStyle} onChange={(event) => onEdit(track.id, 'genreStyle', event.target.value)}>
+                {genreOptions.map((genre) => (
+                  <option key={genre} value={genre}>
+                    {genre}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
         </div>

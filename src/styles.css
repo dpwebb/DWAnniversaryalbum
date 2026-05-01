@@ -434,7 +434,8 @@ textarea:focus {
   text-transform: uppercase;
 }
 
-.inline-field input {
+.inline-field input,
+.inline-field select {
   min-height: 42px;
 }
 
